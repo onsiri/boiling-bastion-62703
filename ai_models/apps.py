@@ -10,8 +10,7 @@ class AiModelsConfig(AppConfig):
         # Use signals to defer database access
         post_migrate.connect(self.my_post_migrate_handler, sender=self)
 
-    @receiver(post_migrate)
     def my_post_migrate_handler(sender, **kwargs):
-        # Your database access code here
-        from .models import Transaction
-        Transaction.objects.create(name="Initial Data")
+        pass  # Remove this initialization logic
+
+
