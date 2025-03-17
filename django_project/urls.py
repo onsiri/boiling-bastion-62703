@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.views.generic.base import RedirectView
 from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -12,5 +13,7 @@ urlpatterns = [
     path("models/", include("ai_models.urls")),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if not settings.DEBUG:
+    urlpatterns += [
+        path('', RedirectView.as_view(url='https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com/')),
+    ]

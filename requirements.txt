@@ -73,3 +73,4 @@ xlrd==2.0.1
 whitenoise==6.1.0
 gunicorn==22.0.0
 dj-database-url==2.1.0
+django-extensions==3.2.3
