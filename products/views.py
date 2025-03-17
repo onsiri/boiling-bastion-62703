@@ -7,5 +7,10 @@ from .models import Product
 
 
 def product_list(request):
-    products = Product.objects.all()
-    return render(request, 'products/product_list.html', {'products': products})
+    try:
+        products = Product.objects.all()
+        return render(request, 'products/product_list.html', {'products': products})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()  # This will log the error to Heroku
+        raise
