@@ -1,0 +1,73 @@
+<!-- templates/ai_models/top_30_sale_forecast.html -->
+{% extends "base.html" %}
+{% block content %}
+<head>
+    <title>Top 30 Sale Forecast</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .sort-indicator {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            margin-left: 5px;
+        }
+        .sort-indicator.asc {
+            border-bottom: 5px solid black;
+        }
+        .sort-indicator.desc {
+            border-top: 5px solid black;
+        }
+    </style>
+    <script>
+        \$(document).ready(function() {
+            \$('th .sort-link').click(function(e) {
+                e.preventDefault();
+                var url = \$(this).attr('href');
+                var column = \$(this).data('column');
+                var order = \$(this).data('order') === 'asc' ? 'desc' : 'asc';
+
+                \$.ajax({
+                    url: url,
+                    success: function(data) {
+                        \$('table').html(\$(data).find('table'));
+
+                        // Update sort indicators
+                        \$('th .sort-link').each(function() {
+                            if (\$(this).data('column') === column) {
+                                \$(this).data('order', order);
+                                \$(this).find('.sort-indicator').toggleClass('asc desc');
+                            } else {
+                                \$(this).data('order', 'asc');
+                                \$(this).find('.sort-indicator').removeClass('desc').addClass('asc');
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>30 Days Sale Forecast </h1>
+    <table border="1">
+        <tr>
+            <th>DS <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link" data-column="ds" data-order="{% if sort_by == 'ds' %}{{ sort_order }}{% else %}asc{% endif %}"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+            <th>Prediction <a href="?sort_by=prediction&sort_order={% if sort_by == 'prediction' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link" data-column="prediction" data-order="{% if sort_by == 'prediction' %}{{ sort_order }}{% else %}asc{% endif %}"><span class="sort-indicator {% if sort_by == 'prediction' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+            <th>Prediction Lower <a href="?sort_by=prediction_lower&sort_order={% if sort_by == 'prediction_lower' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link" data-column="prediction_lower" data-order="{% if sort_by == 'prediction_lower' %}{{ sort_order }}{% else %}asc{% endif %}"><span class="sort-indicator {% if sort_by == 'prediction_lower' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+            <th>Prediction Upper <a href="?sort_by=prediction_upper&sort_order={% if sort_by == 'prediction_upper' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link" data-column="prediction_upper" data-order="{% if sort_by == 'prediction_upper' %}{{ sort_order }}{% else %}asc{% endif %}"><span class="sort-indicator {% if sort_by == 'prediction_upper' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+            <th>Uploaded At <a href="?sort_by=uploaded_at&sort_order={% if sort_by == 'uploaded_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link" data-column="uploaded_at" data-order="{% if sort_by == 'uploaded_at' %}{{ sort_order }}{% else %}asc{% endif %}"><span class="sort-indicator {% if sort_by == 'uploaded_at' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+        </tr>
+        {% for item in top_30_items %}
+        <tr>
+            <td>{{ item.ds }}</td>
+            <td>${{ item.prediction }}</td>
+            <td>${{ item.prediction_lower }}</td>
+            <td>${{ item.prediction_upper }}</td>
+            <td>{{ item.uploaded_at }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+{% endblock %}

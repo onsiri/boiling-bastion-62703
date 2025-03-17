@@ -15,3 +15,12 @@ RUN pip install -r requirements.txt
 
 # Copy project
 COPY . .
+
+# Expose the port
+EXPOSE 8000
+
+# Collect static files
+#RUN python manage.py collectstatic --noinput
+
+# Run the command to start the Gunicorn server
+CMD ["gunicorn", "myproject.wsgi:application", "--workers", "3", "--bind", "0.0.0.0:8000"]

@@ -1,0 +1,56 @@
+<table class="table table-hover">
+    <thead class="thead-light">
+        <tr>
+            <th>
+                <a href="?sort_by=UserId&sort_order={% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
+                   class="sort-link">
+                    <div class="sort-header">
+                        USERID
+                        <span class="sort-indicator {% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>
+                <a href="?sort_by=PredictedItemDescription&sort_order={% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
+                   class="sort-link">
+                    <div class="sort-header">
+                        Item Description
+                        <span class="sort-indicator {% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>
+                <a href="?sort_by=Probability&sort_order={% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
+                   class="sort-link">
+                    <div class="sort-header">
+                        Probability (%)
+                        <span class="sort-indicator {% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>
+                <a href="?sort_by=PredictedItemCost&sort_order={% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
+                   class="sort-link">
+                    <div class="sort-header">
+                        Item Cost
+                        <span class="sort-indicator {% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in future_sale %}
+        <tr>
+            <td>{{ item.UserId }}</td>
+            <td>{{ item.PredictedItemDescription }}</td>
+            <td>{{ item.Probability|floatformat:2 }}%</td>
+            <td>${{ item.PredictedItemCost }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center">No predictions found</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

@@ -1,0 +1,10 @@
+{% extends "admin/import_export/change_form.html" %}
+{% block content %}
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="submit-row">
+        <button type="submit" class="button">Submit</button>
+    </div>
+</form>
+{% endblock %}

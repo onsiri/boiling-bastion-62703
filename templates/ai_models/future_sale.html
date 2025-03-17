@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Future Sales Predictions{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Customer Purchase Probability</h2>
+
+    <!-- Filter Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="filter-form" method="GET" class="form-inline">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="user_id_filter"
+                               value="{{ filters.user_id_filter }}" placeholder="User ID">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="description_filter"
+                               value="{{ filters.description_filter }}" placeholder="Item Description">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="min_probability"
+                               value="{{ filters.min_probability }}" placeholder="Min Probability">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="max_probability"
+                               value="{{ filters.max_probability }}" placeholder="Max Probability">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="min_cost"
+                               value="{{ filters.min_cost }}" placeholder="Min Cost">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="max_cost"
+                               value="{{ filters.max_cost }}" placeholder="Max Cost">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" name="start_date"
+                               value="{{ filters.start_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" name="end_date"
+                               value="{{ filters.end_date }}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Apply</button>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">Clear</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div id="table-container">
+        {% include "ai_models/future_sale_table.html" %}
+    </div>
+</div>
+
+<script>
+\$(document).ready(function() {
+    // Handle sorting clicks
+    \$(document).on('click', '.sort-header', function(e) {
+        e.preventDefault();
+        const sortUrl = \$(this).data('sort-url');
+        const existingParams = new URLSearchParams(window.location.search);
+
+        // Remove existing sort parameters
+        existingParams.delete('sort_by');
+        existingParams.delete('sort_order');
+
+        // Add new sort parameters
+        const newParams = new URLSearchParams(sortUrl.split('?')[1]);
+        newParams.forEach((value, key) => {
+            existingParams.set(key, value);
+        });
+
+        // Build final URL
+        const finalUrl = window.location.pathname + '?' + existingParams.toString();
+
+        \$.ajax({
+            url: finalUrl,
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            success: function(data) {
+                \$('#table-container').html(data);
+                window.history.replaceState(null, null, finalUrl);
+            }
+        });
+    });
+
+    // Handle form submission
+    \$('#filter-form').submit(function(e) {
+        e.preventDefault();
+        const params = \$(this).serialize();
+        window.location.search = params;
+    });
+});
+
+function clearFilters() {
+    // Completely reset URL and reload
+    const url = window.location.pathname;
+    \$.ajax({
+        url: url,
+        success: function(data) {
+            \$('#table-container').html(data);
+            window.history.replaceState(null, null, url);
+        }
+    });
+}
+</script>
+{% endblock %}
