@@ -18,7 +18,16 @@ DEBUG = False
 
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
 
+# Trust Heroku's HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [
+    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
+    'http://localhost:8000'  # For local development
+]
 
+# Required for Django 4.0+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # Application definition
 
