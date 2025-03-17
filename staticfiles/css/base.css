@@ -1,0 +1,171 @@
+/* styles.css */
+
+/* General styles for the body */
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    height: 100vh;
+}
+
+/* Vertical sidebar styles */
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background-color: #333;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sidebar header */
+.sidebar-header {
+    padding: 20px;
+    background-color: #555;
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+/* Sidebar menu items */
+.sidebar-menu {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-menu li {
+    padding: 15px;
+    text-align: center;
+    border-bottom: 1px solid #444;
+    cursor: pointer;
+}
+
+.sidebar-menu li:last-child {
+    border-bottom: none;
+}
+
+.sidebar-menu li:hover {
+    background-color: #444;
+}
+
+/* Divided bar styles */
+.divided-bar {
+    width: 100%;
+    height: 1px;
+    background-color: #444;
+    margin: 10px 0;
+}
+
+/* Main content area */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #e0e0e0; /* Grey background for content area */
+}
+
+/* Header styles */
+.header {
+    width: 100%;
+    height: 120px; /* Increased height */
+    background-color: white; /* White background for header */
+    color: black; /* Black text color for contrast */
+    display: flex;
+    align-items: flex-end; /* Align items to the bottom */
+    justify-content: space-between; /* Space between header content and search box */
+    padding: 0 40px; /* Increased padding */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 3em; /* Increased font size */
+}
+
+/* Search box styles */
+.search-box {
+    position: relative;
+    width: 200px; /* Adjusted width */
+    margin-left: 20px;
+}
+
+.search-box input[type="text"] {
+    padding: 10px 40px 10px 10px; /* Add padding to the right for the icon */
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="gray" class="bi bi-search" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>'); /* Magnifying glass icon */
+    background-repeat: no-repeat;
+    background-position: right 10px center; /* Position the icon inside the input */
+}
+/* Content area */
+.content-area {
+    flex: 1;
+    padding: 20px;
+    background-color: #e0e0e0; /* Grey background for content area */
+    display: flex;
+    flex-direction: column;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+}
+
+th, td {
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+    border-bottom: 1px solid black;
+}
+
+tr {
+    border-bottom: 1px solid #ddd;
+}
+.pagination .page-numbers a,
+.pagination .page-numbers span {
+    font-size: 1.2em; /* Increase font size */
+    margin: 0 5px; /* Add some spacing between page numbers */
+}
+
+.pagination .current {
+    font-weight: bold;
+    color: blue;
+    text-decoration: underline;
+    font-size: 1.2em; /* Ensure current page also has increased font size */
+}
+.sort-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sort-indicator {
+    display: inline-block !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-left: 5px solid transparent !important;
+    border-right: 5px solid transparent !important;
+    border-top: 5px solid #666 !important;
+}
+
+.sort-indicator.asc {
+    border-top: none !important;
+    border-bottom: 5px solid #666 !important;
+}
+
+.sort-indicator.desc {
+    border-top: 5px solid #666 !important;
+    border-bottom: none !important;
+}
+
+th .sort-header {
+    text-decoration: none !important;
+    color: inherit !important;
+}
