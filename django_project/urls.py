@@ -8,7 +8,7 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("pages.urls")),
     path("accounts/", include("accounts.urls")),
-    path("products/", include("products.urls")),
+    path("Products/", include("products.urls")),
     path("models/", include("ai_models.urls")),
 ]
 
