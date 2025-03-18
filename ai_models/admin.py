@@ -6,7 +6,7 @@ from django.urls import reverse
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
 from .utils import generate_forecast, predict_future_sales
 from .models import Transaction
-from .forms import CustomerDetailsCSVForm, CustomerDetailsForm
+from .forms import CustomerDetailsCSVForm, CustomerDetailsForm, ItemsForm
 from .resources import CustomerDetailsResource, TransactionResource
 from import_export.admin import ImportExportModelAdmin
 
@@ -101,14 +101,47 @@ class NextItemPredictionAdmin(admin.ModelAdmin):
     list_display = ['UserId', 'PredictedItemDescription','PredictedItemCost', 'Probability', 'PredictedAt']
 
 class ItemAdmin(admin.ModelAdmin):
+    actions = None
+    change_list_template = 'admin/ai_models/import_csv.html'
     list_display = ['ItemCode', 'ItemDescription', 'CostPerItem', 'uploaded_at']
 
-class CustomerDetailsAdmin(admin.ModelAdmin):
-    #resource_class = CustomerDetailsResource
-    #form = CustomerDetailsForm
+    def changelist_view(self, request, extra_context=None):
+        if request.method == 'POST' and 'file' in request.FILES:
+            file = request.FILES['file']
+            try:
+                df = pd.read_excel(file)
+                required_columns = ['ItemCode', 'ItemDescription', 'CostPerItem']
+                missing = [col for col in required_columns if col not in df.columns]
+                if missing:
+                    raise ValueError(f"Missing columns: {', '.join(missing)}")
 
-    #list_display = ['UserId', 'country', 'age', 'gender','income', 'occupation', 'education_level', 'existing_customer']
-    #search_fields = ['UserId']
+                items = []
+                for index, row in df.iterrows():
+                    try:
+                        items.append(Item(
+                            ItemCode=str(row['ItemCode']).strip(),
+                            ItemDescription=str(row['ItemDescription']).strip(),
+                            CostPerItem=str(row['CostPerItem']).strip()
+                        ))
+                    except Exception as e:
+                        self.message_user(request, f"Error with row {index + 1}: {str(e)}", level=40)
+
+                if items:
+                    Item.objects.bulk_create(items)  # Fixed: Use Item, not CustomerDetail
+                    self.message_user(request, f"Successfully imported {len(items)} items", level=25)  # Updated message
+
+                return HttpResponseRedirect(reverse('admin:ai_models_item_changelist'))  # Fixed URL name
+
+            except Exception as e:
+                self.message_user(request, f"Import error: {str(e)}", level=40)
+                return HttpResponseRedirect(reverse('admin:ai_models_item_changelist'))  # Fixed URL name
+
+        extra_context = extra_context or {}
+        extra_context['upload_url'] = reverse('admin:ai_models_item_changelist')  # Fixed URL name
+        return super().changelist_view(request, extra_context=extra_context)
+
+class CustomerDetailsAdmin(admin.ModelAdmin):
+
     actions = None
     change_list_template = 'admin/ai_models/import_csv.html'
     list_display = ['UserId', 'country', 'age', 'gender', 'income', 'occupation', 'education_level',
