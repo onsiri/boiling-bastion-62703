@@ -1,14 +1,15 @@
 import pandas as pd
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
-from django.urls import reverse
+from django.urls import reverse, path
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
 from .utils import generate_forecast, predict_future_sales
 from .models import Transaction
 from .forms import CustomerDetailsCSVForm, CustomerDetailsForm, ItemsForm
 from .resources import CustomerDetailsResource, TransactionResource
 from import_export.admin import ImportExportModelAdmin
+from django.shortcuts import redirect
 
 
 class TransactionAdmin(admin.ModelAdmin):
@@ -23,6 +24,30 @@ class TransactionAdmin(admin.ModelAdmin):
 
     get_user_id.short_description = 'User ID'
     get_user_id.admin_order_field = 'user__UserId'  # Enable sorting
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "delete_all/",
+                self.admin_site.admin_view(self.delete_all),
+                name="transaction_delete_all",
+            )
+        ]
+        return custom_urls + urls
+
+    def delete_all(self, request):
+        if not self.has_delete_permission(request):
+            return self._dont_delete_related(request)
+
+        try:
+            with transaction.atomic():
+                transaction.objects.all().delete()
+            messages.success(request, "All entries deleted successfully")
+        except Exception as e:
+            messages.error(request, f"Error deleting entries: {str(e)}")
+
+        return redirect("admin:your_app_yourmodel_changelist")
 
     def changelist_view(self, request, extra_context=None):
         if request.method == 'POST' and 'file' in request.FILES:
