@@ -159,3 +159,10 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"  # new
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+AWS_ACCESS_KEY_ID = os.environ.get('AKIAVVZON34FPIMPVOXQ')
+AWS_SECRET_ACCESS_KEY = os.environ.get('Bx3NCMajAWI7mWottpw0tE37GZ2gWZdCs5GJu+y1')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('dsinsight-3904-0253-1082-us-east-1')
+AWS_S3_REGION_NAME = 'us-east-1'  # Your bucket's region
+AWS_QUERYSTRING_AUTH = False  # Avoid auth query params for URLs
