@@ -47,7 +47,7 @@ class TransactionAdmin(admin.ModelAdmin):
         except Exception as e:
             messages.error(request, f"Error deleting entries: {str(e)}")
 
-        return redirect("admin:your_app_yourmodel_changelist")
+        return redirect("admin:your_app_transaction_changelist")
 
     def changelist_view(self, request, extra_context=None):
         if request.method == 'POST' and 'file' in request.FILES:
