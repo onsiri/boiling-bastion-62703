@@ -18,4 +18,4 @@ if settings.DEBUG:
 if not settings.DEBUG:
     urlpatterns += [
         path('', RedirectView.as_view(url='https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com/')),
-    ]
+    ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
