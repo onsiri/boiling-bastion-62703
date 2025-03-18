@@ -12,6 +12,8 @@ class UploadBatch(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
 class Item(models.Model):
+    class Meta:
+        app_label = 'ai_models'
     ItemCode = models.CharField(max_length=50, unique=True)
     ItemDescription = models.CharField(max_length=200)
     CostPerItem = models.DecimalField(max_digits=10, decimal_places=2)
@@ -31,8 +33,10 @@ class sale_forecast(models.Model):
 
 
 class CustomerDetail(models.Model):
+    class Meta:
+        app_label = 'ai_models'
     UserId = models.CharField(max_length=100, unique=True)
-    existing_customer = models.CharField(max_length=3)
+    existing_customer = models.BooleanField()
     country = models.CharField(max_length=100)
     age = models.IntegerField()
     gender = models.CharField(max_length=10)
@@ -41,9 +45,11 @@ class CustomerDetail(models.Model):
     education_level = models.CharField(max_length=100)
     uploaded_at = models.DateTimeField(auto_now=True, null=True)
     def __str__(self):
-        return f"{self.UserId} - {self.country}"
+        return f"{self.UserId} "
 
 class Transaction(models.Model):
+    class Meta:
+        app_label = 'ai_models'
     user = models.ForeignKey(
         CustomerDetail,
         on_delete=models.CASCADE,
@@ -64,6 +70,8 @@ class Transaction(models.Model):
 
 
 class NextItemPrediction(models.Model):
+    class Meta:
+        app_label = 'ai_models'
     UserId = models.CharField(max_length=100)
     PredictedItemCode = models.CharField(max_length=100)
     PredictedItemDescription = models.CharField(max_length=200, null=True)

@@ -1,0 +1,14 @@
+{# templates/admin/bulk_delete_confirmation.html #}
+{% extends "admin/delete_confirmation.html" %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <p>Are you sure you want to delete ALL records?</p>
+  <div class="submit-row">
+    <input type="submit" value="Confirm Delete All">
+    <!-- Fix back link using admin URL names -->
+    <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">Cancel</a>
+  </div>
+</form>
+{% endblock %}

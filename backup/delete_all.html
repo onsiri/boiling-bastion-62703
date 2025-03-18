@@ -1,0 +1,24 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{% trans "Delete All Transactions" %}</h1>
+    <p>
+        {% blocktrans count count=total_entries %}
+        You are about to delete all {{ count }} transaction. This cannot be undone.
+        {% plural %}
+        You are about to delete all {{ count }} transactions. This cannot be undone.
+        {% endblocktrans %}
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="submit-row">
+            <input type="submit" value="{% trans 'Permanently Delete All' %}" class="deletelink">
+            <a href="{% url 'admin:ai_models_transaction_changelist' %}" class="button cancel-link">
+                {% trans "Cancel" %}
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

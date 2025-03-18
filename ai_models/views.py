@@ -107,3 +107,5 @@ def future_sale_prediction(request):
         return render(request, 'ai_models/future_sale_table.html', context)
 
     return render(request, 'ai_models/future_sale.html', context)
+
+

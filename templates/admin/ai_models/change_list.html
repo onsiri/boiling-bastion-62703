@@ -1,0 +1,31 @@
+{# templates/admin/ai_models/change_list.html #}
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools %}
+<div class="object-tools">
+    {# Delete All Button #}
+    {% if show_delete_all %}
+    <form action="{% url opts|admin_urlname:'delete_all' %}" method="POST" style="display: inline; margin-right: 15px">
+        {% csrf_token %}
+        <input type="submit" value="{% trans 'Delete All' %}"
+               class="deletelink"
+               onclick="return confirm('{% blocktrans with name=opts.verbose_name_plural %}Delete ALL {{ name }}?{% endblocktrans %}')">
+    </form>
+    {% endif %}
+
+    {# Bulk Upload Button #}
+    {% if show_upload %}
+    <form method="post"
+          enctype="multipart/form-data"
+          action="{% url opts|admin_urlname:'bulk_upload' %}"
+          style="display: inline-block;">
+        {% csrf_token %}
+        <input type="file" name="file" accept=".csv, .xlsx, .xls" required>
+        <button type="submit" class="button">{% trans "Bulk Upload" %}</button>
+    </form>
+    {% endif %}
+
+    {{ block.super }}  {# Preserve the default "Add" button #}
+</div>
+{% endblock %}

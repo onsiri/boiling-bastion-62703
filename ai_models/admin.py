@@ -1,235 +1,299 @@
 import pandas as pd
 from django.contrib import admin, messages
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.urls import reverse, path
+from django.shortcuts import redirect, render
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
 from .utils import generate_forecast, predict_future_sales
-from .models import Transaction
-from .forms import CustomerDetailsCSVForm, CustomerDetailsForm, ItemsForm
-from .resources import CustomerDetailsResource, TransactionResource
-from import_export.admin import ImportExportModelAdmin
-from django.shortcuts import redirect
 
 
-class TransactionAdmin(admin.ModelAdmin):
-    #resource_class = TransactionResource
-    actions = None
-    change_list_template = 'admin/ai_models/import_csv.html'
-    list_display = ['get_user_id', 'TransactionId', 'TransactionTime', 'ItemDescription',
-                    'NumberOfItemsPurchased', 'CostPerItem', 'Country', 'uploaded_at']
+class BulkActionMixin:
+    # Bulk delete configuration
+    show_delete_all = True
+    delete_confirmation_template = None  # Set a custom template if needed
 
-    def get_user_id(self, obj):
-        return obj.user.UserId  # Access UserId through the ForeignKey
-
-    get_user_id.short_description = 'User ID'
-    get_user_id.admin_order_field = 'user__UserId'  # Enable sorting
+    # Bulk upload configuration
+    show_upload = True
+    upload_confirmation_template = None
 
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path(
-                "delete_all/",
-                self.admin_site.admin_view(self.delete_all),
-                name="transaction_delete_all",
-            )
+                'delete_all/',
+                self.admin_site.admin_view(self.delete_all_view),
+                name=f'{self.model._meta.app_label}_{self.model._meta.model_name}_delete_all'
+            ),
+            path(
+                'bulk_upload/',
+                self.admin_site.admin_view(self.bulk_upload_view),
+                name=f'{self.model._meta.app_label}_{self.model._meta.model_name}_bulk_upload'
+            ),
         ]
         return custom_urls + urls
 
-    def delete_all(self, request):
-        if not self.has_delete_permission(request):
-            return self._dont_delete_related(request)
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update({
+            'show_delete_all': self.show_delete_all,
+            'show_upload': self.show_upload,
+        })
+        return super().changelist_view(request, extra_context)
+
+    def delete_all_view(self, request):
+        if request.method == 'POST':
+            try:
+                deleted_count, _ = self.model.objects.all().delete()
+                self.message_user(
+                    request,
+                    f"Successfully deleted {deleted_count} records",
+                    level=messages.SUCCESS
+                )
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Error deleting records: {str(e)}",
+                    level=messages.ERROR
+                )
+            changelist_url = reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist')
+            return redirect(changelist_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'opts': self.model._meta,
+            'title': 'Confirm Bulk Delete'
+        }
+        return render(
+            request,
+            self.delete_confirmation_template or 'admin/bulk_delete_confirmation.html',
+            context
+        )
+
+    def bulk_upload_view(self, request):
+        if request.method == 'POST':
+            file = request.FILES.get('file')
+            if not file:
+                self.message_user(request, "No file uploaded", level=40)
+                changelist_url = reverse(
+                    f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
+                )
+                return redirect(changelist_url)
+
+            try:
+                df = self._process_uploaded_file(file)
+                return self.process_dataframe(request, df)
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Error processing file: {str(e)}",
+                    level=40
+                )
+                changelist_url = reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist')
+                return redirect(changelist_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'opts': self.model._meta,
+            'title': 'Bulk Upload'
+        }
+        return render(
+            request,
+            self.upload_confirmation_template or 'admin/bulk_upload_form.html',
+            context
+        )
+
+    def _handle_bulk_upload(self, request):
+        file = request.FILES.get('file')
+        if file is None:
+            self.message_user(request, "No file uploaded", level=messages.ERROR)
+            changelist_url = reverse(
+                f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
+            )
+            return redirect(changelist_url)
 
         try:
-            with transaction.atomic():
-                transaction.objects.all().delete()
-            messages.success(request, "All entries deleted successfully")
+            df = self._process_uploaded_file(file)
+            return self.process_dataframe(request, df)
         except Exception as e:
-            messages.error(request, f"Error deleting entries: {str(e)}")
+            self.message_user(
+                request,
+                f"Error processing file: {str(e)}",
+                level=messages.ERROR
+            )
+            changelist_url = reverse(
+                f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
+            )
+            return redirect(changelist_url)
 
-        return redirect("admin:your_app_transaction_changelist")
+    def _process_uploaded_file(self, file):
+        import pandas as pd
+        if file.name.endswith('.csv'):
+            return pd.read_csv(file)
+        elif file.name.endswith(('.xls', '.xlsx')):
+            return pd.read_excel(file)
+        else:
+            raise ValueError("Unsupported file format")
 
-    def changelist_view(self, request, extra_context=None):
-        if request.method == 'POST' and 'file' in request.FILES:
-            file = request.FILES['file']
+    def _validate_columns(self, df, required_columns):
+        missing = required_columns - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+    def process_dataframe(self, request, df):
+        raise NotImplementedError("Subclasses must implement process_dataframe()")
+
+
+# Concrete Admin Classes
+class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
+    list_display = ['get_user_id', 'TransactionId', 'TransactionTime', 'ItemDescription',
+                    'NumberOfItemsPurchased', 'CostPerItem', 'Country', 'uploaded_at']
+    show_delete_all = True  # Set to True
+    show_upload = True
+    def get_user_id(self, obj):
+        return obj.user.UserId
+
+    get_user_id.short_description = 'User ID'
+    get_user_id.admin_order_field = 'user__UserId'
+
+    def process_dataframe(self, request, df):
+        required_columns = {'UserId', 'TransactionId', 'TransactionTime', 'ItemCode',
+                            'ItemDescription', 'NumberOfItemsPurchased', 'CostPerItem', 'Country'}
+        self._validate_columns(df, required_columns)
+
+        transactions = []
+        customer_cache = {}
+        for _, row in df.iterrows():
             try:
-                # Read the Excel file
-                df = pd.read_excel(file)
+                user_id = str(row['UserId']).strip()
+                if user_id not in customer_cache:
+                    customer_cache[user_id] = CustomerDetail.objects.get(UserId=user_id)
 
-                # Validate required columns
-                required_columns = ['UserId', 'TransactionId', 'TransactionTime',
-                                    'ItemCode', 'ItemDescription', 'NumberOfItemsPurchased',
-                                    'CostPerItem', 'Country']
-                missing = [col for col in required_columns if col not in df.columns]
-                if missing:
-                    raise ValueError(f"Missing columns: {', '.join(missing)}")
-
-                # Prepare data for bulk create
-                transactions = []
-                customer_cache = {}
-
-                for index, row in df.iterrows():
-                    try:
-                        # Get or cache CustomerDetail
-                        user_id = str(row['UserId']).strip()
-                        if user_id not in customer_cache:
-                            customer = CustomerDetail.objects.get(UserId=user_id)
-                            customer_cache[user_id] = customer
-
-                        transactions.append(Transaction(
-                            user=customer_cache[user_id],
-                            TransactionId=str(row['TransactionId']).strip(),
-                            TransactionTime=str(row['TransactionTime']),
-                            ItemCode=str(row['ItemCode']).strip(),
-                            ItemDescription=str(row['ItemDescription']),
-                            NumberOfItemsPurchased=int(row['NumberOfItemsPurchased']),
-                            CostPerItem=float(row['CostPerItem']),
-                            Country=str(row['Country']).strip()
-                        ))
-                    except CustomerDetail.DoesNotExist:
-                        self.message_user(request,
-                                          f"Skipped transaction {row['TransactionId']} - User ID {user_id} not found",
-                                          level=40
-                                          )
-                    except Exception as e:
-                        self.message_user(request,
-                                          f"Error with transaction {row.get('TransactionId', 'N/A')}: {str(e)}",
-                                          level=40
-                                          )
-
-                # Bulk create transactions
-                if transactions:
-                    Transaction.objects.bulk_create(transactions)
-                    self.message_user(request,
-                                      f"Successfully imported {len(transactions)} transactions",
-                                      level=25
-                                      )
-
-                    # Generate forecasts
-                    generate_forecast()
-                    predict_future_sales()
-
-                return HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
-
+                transactions.append(Transaction(
+                    user=customer_cache[user_id],
+                    TransactionId=str(row['TransactionId']).strip(),
+                    TransactionTime=pd.to_datetime(row['TransactionTime']),
+                    ItemCode=str(row['ItemCode']).strip(),
+                    ItemDescription=str(row['ItemDescription']),
+                    NumberOfItemsPurchased=int(row['NumberOfItemsPurchased']),
+                    CostPerItem=float(row['CostPerItem']),
+                    Country=str(row['Country']).strip()
+                ))
+            except CustomerDetail.DoesNotExist:
+                self.message_user(request, f"Skipped transaction {row['TransactionId']} - User ID {user_id} not found",
+                                  level=40)
             except Exception as e:
-                self.message_user(request, f"Import error: {str(e)}", level=40)
-                return HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
+                self.message_user(request, f"Error with transaction {row.get('TransactionId', 'N/A')}: {str(e)}",
+                                  level=40)
 
-        extra_context = extra_context or {}
-        extra_context['upload_url'] = reverse('admin:ai_models_transaction_changelist')
-        return super().changelist_view(request, extra_context=extra_context)
+        if transactions:
+            Transaction.objects.bulk_create(transactions)
+            self.message_user(request, f"Imported {len(transactions)} transactions successfully", level=25)
+            generate_forecast()
+            predict_future_sales()
 
+        return HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
+
+
+class ItemAdmin(BulkActionMixin, admin.ModelAdmin):
+    list_display = ['ItemCode', 'ItemDescription', 'CostPerItem', 'uploaded_at']
+    show_delete_all = True  # Set to True
+    show_upload = True
+    def process_dataframe(self, request, df):
+        required_columns = {'ItemCode', 'ItemDescription', 'CostPerItem'}
+        self._validate_columns(df, required_columns)
+        items = []
+        for index, row in df.iterrows():
+            try:
+                items.append(Item(
+                    ItemCode=str(row['ItemCode']).strip(),
+                    ItemDescription=str(row['ItemDescription']).strip(),
+                    CostPerItem=float(row['CostPerItem'])
+                ))
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Error with item {row.get('ItemCode', 'N/A')}: {str(e)}",  # Fix error message
+                    level=40
+                )
+
+        if items:
+            Item.objects.bulk_create(items)
+            self.message_user(request, f"Imported {len(items)} items successfully", level=25)
+
+        return HttpResponseRedirect(reverse('admin:ai_models_item_changelist'))
+
+
+class CustomerDetailsAdmin(BulkActionMixin, admin.ModelAdmin):
+    list_display = ['UserId', 'country', 'age', 'gender', 'income', 'occupation',
+                    'education_level', 'existing_customer']
+    show_delete_all = True
+    show_upload = True
+
+    def get_urls(self):
+        return super().get_urls()
+
+    def process_dataframe(self, request, df):
+        required_columns = {
+            'UserId', 'country', 'age', 'gender', 'income',
+            'occupation', 'education_level', 'existing_customer'
+        }
+        self._validate_columns(df, required_columns)
+
+        customers = []
+        for index, row in df.iterrows():
+            try:
+                customers.append(CustomerDetail(
+                    UserId=str(row['UserId']).strip(),
+                    country=str(row['country']).strip(),
+                    age=int(row['age']),
+                    gender=str(row['gender']).strip(),
+                    income=float(row['income']),
+                    occupation=str(row['occupation']).strip(),
+                    education_level=str(row['education_level']).strip(),
+                    existing_customer=True if str(row['existing_customer']).strip().lower() in ['yes', 'Yes', '1'] else False
+                ))
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Error creating customer object: {str(e)}",
+                    level=40
+                )
+
+        try:
+            CustomerDetail.objects.bulk_create(customers)
+            self.message_user(
+                request,
+                f"Imported {len(customers)} customers successfully",
+                level=25
+            )
+        except Exception as e:
+            self.message_user(
+                request,
+                f"Error importing customers: {str(e)}",
+                level=40
+            )
+        return HttpResponseRedirect(reverse('admin:ai_models_customerdetail_changelist'))
+
+
+# Standard Admins
 class SaleForecastAdmin(admin.ModelAdmin):
     list_display = ['ds', 'prediction', 'prediction_lower', 'prediction_upper', 'uploaded_at']
 
+
 class NextItemPredictionAdmin(admin.ModelAdmin):
-    list_display = ['UserId', 'PredictedItemDescription','PredictedItemCost', 'Probability', 'PredictedAt']
+    list_display = ['UserId', 'PredictedItemCode', 'PredictedItemDescription',  'PredictedItemCost','Probability','PredictedAt']
 
-class ItemAdmin(admin.ModelAdmin):
-    actions = None
-    change_list_template = 'admin/ai_models/import_csv.html'
-    list_display = ['ItemCode', 'ItemDescription', 'CostPerItem', 'uploaded_at']
-
-    def changelist_view(self, request, extra_context=None):
-        if request.method == 'POST' and 'file' in request.FILES:
-            file = request.FILES['file']
-            try:
-                df = pd.read_excel(file)
-                required_columns = ['ItemCode', 'ItemDescription', 'CostPerItem']
-                missing = [col for col in required_columns if col not in df.columns]
-                if missing:
-                    raise ValueError(f"Missing columns: {', '.join(missing)}")
-
-                items = []
-                for index, row in df.iterrows():
-                    try:
-                        items.append(Item(
-                            ItemCode=str(row['ItemCode']).strip(),
-                            ItemDescription=str(row['ItemDescription']).strip(),
-                            CostPerItem=str(row['CostPerItem']).strip()
-                        ))
-                    except Exception as e:
-                        self.message_user(request, f"Error with row {index + 1}: {str(e)}", level=40)
-
-                if items:
-                    Item.objects.bulk_create(items)  # Fixed: Use Item, not CustomerDetail
-                    self.message_user(request, f"Successfully imported {len(items)} items", level=25)  # Updated message
-
-                return HttpResponseRedirect(reverse('admin:ai_models_item_changelist'))  # Fixed URL name
-
-            except Exception as e:
-                self.message_user(request, f"Import error: {str(e)}", level=40)
-                return HttpResponseRedirect(reverse('admin:ai_models_item_changelist'))  # Fixed URL name
-
-        extra_context = extra_context or {}
-        extra_context['upload_url'] = reverse('admin:ai_models_item_changelist')  # Fixed URL name
-        return super().changelist_view(request, extra_context=extra_context)
-
-class CustomerDetailsAdmin(admin.ModelAdmin):
-
-    actions = None
-    change_list_template = 'admin/ai_models/import_csv.html'
-    list_display = ['UserId', 'country', 'age', 'gender', 'income', 'occupation', 'education_level',
-                    'existing_customer']
-
-    def changelist_view(self, request, extra_context=None):
-        if request.method == 'POST' and 'file' in request.FILES:
-            file = request.FILES['file']
-            try:
-                # Read the Excel file
-                df = pd.read_excel(file)
-
-                # Validate required columns
-                required_columns = ['UserId', 'existing_customer', 'country', 'age', 'gender', 'income', 'occupation',
-                                    'education_level']
-                missing = [col for col in required_columns if col not in df.columns]
-                if missing:
-                    raise ValueError(f"Missing columns: {', '.join(missing)}")
-
-                # Prepare data for bulk create
-                customers = []
-                for index, row in df.iterrows():
-                    try:
-                        customers.append(CustomerDetail(
-                            UserId=str(row['UserId']).strip(),
-                            existing_customer=str(row['existing_customer']).strip(),
-                            country=str(row['country']).strip(),
-                            age=int(row['age']),
-                            gender=str(row['gender']).strip(),
-                            income=int(row['income']),
-                            occupation=str(row['occupation']).strip(),
-                            education_level=str(row['education_level']).strip()
-                        ))
-                    except Exception as e:
-                        self.message_user(request, f"Error with customer {row.get('UserId', 'N/A')}: {str(e)}",
-                                          level=40)
-
-                # Bulk create customers
-                if customers:
-                    CustomerDetail.objects.bulk_create(customers)
-                    self.message_user(request, f"Successfully imported {len(customers)} customers", level=25)
-
-                return HttpResponseRedirect(reverse('admin:ai_models_customerdetail_changelist'))
-
-            except Exception as e:
-                self.message_user(request, f"Import error: {str(e)}", level=40)
-                return HttpResponseRedirect(reverse('admin:ai_models_customerdetail_changelist'))
-
-        extra_context = extra_context or {}
-        extra_context['upload_url'] = reverse('admin:ai_models_customerdetail_changelist')
-        return super().changelist_view(request, extra_context=extra_context)
 
 class NewCustomerRecommendationAdmin(admin.ModelAdmin):
     list_display = ['user', 'item_code', 'confidence_score', 'generation_date', 'expiry_date']
+    raw_id_fields = ['user']
 
-def save_related(self, request, form, formsets, change):
-        # Handle bulk uploads within a transaction
-    with transaction.atomic():
-        super().save_related(request, form, formsets, change)
 
+# Registration
 admin.site.register(Transaction, TransactionAdmin)
-admin.site.register(NextItemPrediction, NextItemPredictionAdmin)
-admin.site.register(sale_forecast, SaleForecastAdmin)
 admin.site.register(Item, ItemAdmin)
 admin.site.register(CustomerDetail, CustomerDetailsAdmin)
+admin.site.register(sale_forecast, SaleForecastAdmin)
+admin.site.register(NextItemPrediction, NextItemPredictionAdmin)
 admin.site.register(NewCustomerRecommendation, NewCustomerRecommendationAdmin)
