@@ -109,7 +109,7 @@ def predict_future_sales():
             y = np.array([user_sequence[-1]])
 
             # Train the model
-            model.fit(X, y, epochs=10, batch_size=1, verbose=0)
+            model.fit(X, y, epochs=5, batch_size=32, verbose=0)
 
             # Generate predictions
             prediction = model.predict(X, verbose=0)
