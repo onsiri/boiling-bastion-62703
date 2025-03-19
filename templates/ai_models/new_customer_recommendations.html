@@ -12,67 +12,53 @@
 
     <!-- Filter Form -->
     <form id="recommendation-filter" class="mb-4">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <input type="number" name="min_age" class="form-control" placeholder="Minimum Age">
-            </div>
-            <div class="col-md-4">
-                <select name="gender" class="form-select">
-                    <option value="">All Genders</option>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-outline-secondary">Filter</button>
-            </div>
+    <div class="row g-3 align-items-end">
+        <div class="col-md-2">
+            <input type="text" name="customer_id" class="form-control"
+                   placeholder="Customer ID" value="{{ request.GET.customer_id }}">
         </div>
-    </form>
-
-    <!-- Recommendations Table -->
-    <div id="recommendation-table" class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th><a href="?sort=customer_id" class="rec-sort-header">Customer ID</a></th>
-                            <th><a href="?sort=name" class="rec-sort-header">Name</a></th>
-                            <th><a href="?sort=predicted_interest" class="rec-sort-header">Interest Score</a></th>
-                            <th>Recommended Products</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for recommendation in recommendations %}
-                        <tr>
-                            <td>{{ recommendation.customer_id }}</td>
-                            <td>{{ recommendation.name }}</td>
-                            <td>{{ recommendation.predicted_interest|floatformat:2 }}</td>
-                            <td>
-                                {% for product in recommendation.products %}
-                                <span class="badge bg-primary me-1">{{ product }}</span>
-                                {% endfor %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center">No recommendations found. Generate some first!</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="col-md-2">
+            <input type="text" name="name" class="form-control"
+                   placeholder="Customer Name" value="{{ request.GET.name }}">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="min_age" class="form-control"
+                   placeholder="Min Age" value="{{ request.GET.min_age }}">
+        </div>
+        <div class="col-md-2">
+            <select name="gender" class="form-select">
+                <option value="">All Genders</option>
+                <option value="M" {% if request.GET.gender == 'M' %}selected{% endif %}>Male</option>
+                <option value="F" {% if request.GET.gender == 'F' %}selected{% endif %}>Female</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="min_confidence" class="form-control"
+                   placeholder="Min Confidence" step="0.01" min="0" max="1"
+                   value="{{ request.GET.min_confidence }}">
+        </div>
+        <div class="col-md-2">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+                <a href="?" class="btn btn-secondary w-100">Clear</a>
             </div>
         </div>
     </div>
+</form>
+
+    <!-- Table Container -->
+    {% include 'ai_models/new_customer_recommendations_table.html' %}
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Generate Recommendations Handler
     const generateBtn = document.getElementById('generate-recommendations');
+    let isLoading = false;
 
+    // Generate Recommendations Handler
     if (generateBtn) {
         generateBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -115,16 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         header.addEventListener('click', function(e) {
             e.preventDefault();
             const sortUrl = this.href;
-
-            fetch(sortUrl, {
-                headers: {'X-Requested-With': 'XMLHttpRequest'}
-            })
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('recommendation-table').innerHTML = html;
-                window.history.replaceState(null, null, sortUrl);
-            })
-            .catch(error => console.error('Sorting error:', error));
+            window.location.href = sortUrl;
         });
     });
 

@@ -7,7 +7,9 @@ from urllib.parse import urlencode
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.management import call_command
-
+from django.core.paginator import Paginator
+from django.views.generic import ListView
+from django.db.models import F
 def top_30_sale_forecast(request):
     sort_by = request.GET.get('sort_by', 'uploaded_at')
     sort_order = request.GET.get('sort_order', 'desc')
@@ -191,3 +193,18 @@ def generate_recommendations(request):
         return JsonResponse({'status': 'success', 'message': 'Recommendations generated successfully'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def customer_recommendations(request):
+    recommendations = NewCustomerRecommendation.objects.all().order_by('-confidence_score')
+
+    # Add your filter logic here
+
+    paginator = Paginator(recommendations, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'ai_models/new_customer_recommendations.html', {
+        'page_obj': page_obj,  # Make sure this key is used
+        'recommendations': page_obj.object_list,
+    })
