@@ -60,81 +60,136 @@ def generate_forecast():
             uploaded_at=datetime.now()
         )
 
+
 def predict_future_sales():
     try:
-        # Get transactions from the last 5 minutes to avoid processing old data
-        time_threshold = timezone.now() - timezone.timedelta(minutes=5)
-        recent_transactions = Transaction.objects.all()#filter(uploaded_at__gte=time_threshold)
-        if not recent_transactions.exists():
-            print("No recent transactions to process")
+        # Batch processing parameters
+        BATCH_SIZE = 1024
+        SEQUENCE_LENGTH = 10
+        EPOCHS = 5
+
+        # Get transactions with efficient database query
+        transactions = Transaction.objects.select_related('user').values(
+            'user_id', 'ItemCode'
+        ).order_by('user_id', 'TransactionTime')
+
+        if not transactions.exists():
+            print("No transactions to process")
             return
 
-        print("Starting prediction for recent upload")
+        print("Starting prediction processing")
 
-        # Convert to DataFrame
-        df = pd.DataFrame(list(recent_transactions.values('user_id', 'ItemCode')))
+        # Single database query to get all items
+        items = Item.objects.all().values('ItemCode', 'ItemDescription', 'CostPerItem')
+        item_df = pd.DataFrame(items)
+        item_map = item_df.set_index('ItemCode').to_dict('index')
 
-        # Encode ItemCode to integers
+        # Prepare label encoder with all possible items
         label_encoder = LabelEncoder()
-        df['ItemCodeEncoded'] = label_encoder.fit_transform(df['ItemCode'])
+        all_item_codes = item_df['ItemCode'].unique()
+        label_encoder.fit(all_item_codes)
 
-        # Group sequences by user
-        unique_users = df['user_id'].unique()
+        # Prepare data in pandas with vectorized operations
+        df = pd.DataFrame(transactions)
+        df['ItemCodeEncoded'] = label_encoder.transform(df['ItemCode'])
 
-        # Define the model outside the loop
-        sequence_length = 10
+        # Precompute user sequences in a dictionary
+        user_sequences = df.groupby('user_id')['ItemCodeEncoded'].apply(list).to_dict()
+
+        # Model initialization (single instance)
         model = Sequential([
-            Embedding(
-                input_dim=len(label_encoder.classes_),
-                output_dim=50
-            ),
-            LSTM(100),
+            Embedding(input_dim=len(label_encoder.classes_), output_dim=64),
+            LSTM(128, return_sequences=False),
             Dense(len(label_encoder.classes_), activation='softmax')
         ])
-        model.compile(loss='sparse_categorical_crossentropy', optimizer='adam')
+        model.compile(
+            optimizer='adam',
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
+        )
 
-        for user in unique_users:
-            user_df = df[df['user_id'] == user]
-            if len(user_df) < sequence_length:
+        predictions = []
+        user_batch = []
+        sequence_batch = []
+
+        # Batch processing of users
+        for user_id, sequence in user_sequences.items():
+            if len(sequence) < SEQUENCE_LENGTH:
                 continue
 
-            # Get sequence of transactions for this user
-            user_sequence = user_df['ItemCodeEncoded'].tolist()
+            # Extract sequences using sliding window approach
+            for i in range(len(sequence) - SEQUENCE_LENGTH):
+                seq = sequence[i:i + SEQUENCE_LENGTH]
+                sequence_batch.append(seq[:-1])
+                user_batch.append((user_id, seq[-1]))
 
-            # Pad sequences for the LSTM model
-            padded_sequence = np.array([user_sequence[-sequence_length:]]).reshape(1, -1)
+            if len(sequence_batch) >= BATCH_SIZE:
+                # Convert to numpy arrays
+                X = pad_sequences(sequence_batch, maxlen=SEQUENCE_LENGTH - 1)
+                y = np.array([item[1] for item in user_batch])
 
-            # Prepare training data
-            X = padded_sequence[:, :-1]
-            y = np.array([user_sequence[-1]])
+                # Train on batch
+                model.train_on_batch(X, y)
 
-            # Train the model
-            model.fit(X, y, epochs=5, batch_size=32, verbose=0)
+                # Generate predictions
+                preds = model.predict(X, batch_size=BATCH_SIZE, verbose=0)
+                predicted_indices = np.argmax(preds, axis=1)
 
-            # Generate predictions
-            prediction = model.predict(X, verbose=0)
-            predicted_index = np.argmax(prediction[0])
-            predicted_item_code = label_encoder.inverse_transform([predicted_index])[0]
-            probability = np.max(prediction[0])
+                # Process batch predictions
+                for (user_id, _), pred_idx in zip(user_batch, predicted_indices):
+                    item_code = label_encoder.inverse_transform([pred_idx])[0]
+                    predictions.append(NextItemPrediction(
+                        UserId=user_id,
+                        PredictedItemCode=item_code,
+                        PredictedItemDescription=item_map[item_code]['ItemDescription'],
+                        PredictedItemCost=item_map[item_code]['CostPerItem'],
+                        Probability=np.max(preds),
+                        PredictedAt=timezone.now()
+                    ))
 
-            item = Item.objects.get(ItemCode=predicted_item_code)
-            item_description = item.ItemDescription
-            item_cost = item.CostPerItem
+                sequence_batch = []
+                user_batch = []
 
-            # Save the prediction
-            NextItemPrediction.objects.update_or_create(
-                UserId=str(user),
-                defaults={
-                    'PredictedItemCode': predicted_item_code,
-                    'Probability': probability,
-                    'PredictedItemDescription': item_description,
-                    'PredictedItemCost': item_cost,
-                    'PredictedAt': timezone.now()
-                }
+        # Process remaining items in last batch
+        if sequence_batch:
+            X = pad_sequences(sequence_batch, maxlen=SEQUENCE_LENGTH - 1)
+            y = np.array([item[1] for item in user_batch])
+            model.train_on_batch(X, y)
+            preds = model.predict(X, verbose=0)
+            predicted_indices = np.argmax(preds, axis=1)
+
+            for (user_id, _), pred_idx in zip(user_batch, predicted_indices):
+                item_code = label_encoder.inverse_transform([pred_idx])[0]
+                predictions.append(NextItemPrediction(
+                    UserId=user_id,
+                    PredictedItemCode=item_code,
+                    PredictedItemDescription=item_map[item_code]['ItemDescription'],
+                    PredictedItemCost=item_map[item_code]['CostPerItem'],
+                    Probability=np.max(preds),
+                    PredictedAt=timezone.now()
+                ))
+
+        # Bulk create predictions
+        with transaction.atomic():
+            NextItemPrediction.objects.bulk_create(
+                predictions,
+                batch_size=1000,
+                update_conflicts=True,
+                update_fields=[
+                    'PredictedItemCode',
+                    'PredictedItemDescription',
+                    'PredictedItemCost',
+                    'Probability',
+                    'PredictedAt'
+                ],
+                unique_fields=['UserId']
             )
-        print(f"prediction has completed ")
+
+        print(f"Successfully processed {len(predictions)} predictions")
+
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"Prediction error: {str(e)}")
+        raise
 
 
 

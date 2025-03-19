@@ -19,7 +19,7 @@ class PredictionPipeline:
 
         print("[3/4] Fetching new customers...")
         new_customers = CustomerDetail.objects.filter(
-            existing_customer='No'
+            existing_customer=False
         )
         print(f"Found {new_customers.count()} new customers to process")
 
@@ -68,7 +68,7 @@ class PredictionPipeline:
         indices = [int(idx) for idx in indices]
 
         # Get existing customer IDs from the prepared features
-        existing_customers = CustomerDetail.objects.filter(existing_customer='Yes')
+        existing_customers = CustomerDetail.objects.filter(existing_customer=True)
         neighbor_ids = [existing_customers[idx].id for idx in indices]
 
         # Get neighbor customers and their transactions

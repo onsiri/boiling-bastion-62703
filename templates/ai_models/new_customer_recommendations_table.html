@@ -1,0 +1,55 @@
+<table class="table table-hover">
+    <thead class="thead-dark">
+        <tr>
+            <th>
+                <a href="?sort_by={% if sort_by == 'user__UserId' %}{% if sort_order == 'asc' %}user__UserId{% else %}-user__UserId{% endif %}{% else %}user__UserId{% endif %}">
+                    <div class="rec-sort-header">
+                        User ID
+                        <span class="sort-indicator {% if sort_by == 'user__UserId' %}sorted-{{ sort_order }}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>
+                <a href="?sort_by={% if sort_by == 'item_code' %}{% if sort_order == 'asc' %}item_code{% else %}-item_code{% endif %}{% else %}item_code{% endif %}">
+                    <div class="rec-sort-header">
+                        Item Code
+                        <span class="sort-indicator {% if sort_by == 'item_code' %}sorted-{{ sort_order }}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>Type</th>
+            <th>
+                <a href="?sort_by={% if sort_by == 'confidence_score' %}{% if sort_order == 'asc' %}confidence_score{% else %}-confidence_score{% endif %}{% else %}-confidence_score{% endif %}">
+                    <div class="rec-sort-header">
+                        Confidence
+                        <span class="sort-indicator {% if sort_by == 'confidence_score' %}sorted-{{ sort_order }}{% endif %}"></span>
+                    </div>
+                </a>
+            </th>
+            <th>Generated</th>
+            <th>Expires</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for rec in recommendations %}
+        <tr>
+            <td>{{ rec.user.UserId }}</td>
+            <td>{{ rec.item_code }}</td>
+            <td>{{ rec.get_recommendation_type_display }}</td>
+            <td>{{ rec.confidence_score|floatformat:2 }}</td>
+            <td>{{ rec.generation_date|date:"Y-m-d" }}</td>
+            <td>
+                {% if rec.expiry_date %}
+                {{ rec.expiry_date|date:"Y-m-d" }}
+                {% else %}
+                -
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center">No recommendations found</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

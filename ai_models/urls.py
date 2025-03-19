@@ -4,10 +4,14 @@ from . import views
 
 from django.conf import settings
 from django.conf.urls.static import static
-app_name = 'ai_models_admin'  # Unique namespace for this app's admin
+app_name = 'ai_models'  # Unique namespace for this app's admin
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('top-30-sale-forecast/', views.top_30_sale_forecast, name='top_30_sale_forecast'),
     path('future_sale/', views.future_sale_prediction, name='future_sale'),
+    path('new-recommendations/', views.new_customer_recommendations, name='new_customer_recommendations'),
+    path('generate-recommendations/', views.generate_recommendations, name='generate_recommendations'),
 ]
+
+
 

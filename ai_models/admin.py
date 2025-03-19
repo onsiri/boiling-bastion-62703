@@ -1,7 +1,7 @@
 import pandas as pd
 from django.contrib import admin, messages
 from django.db import transaction
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
@@ -75,33 +75,24 @@ class BulkActionMixin:
             file = request.FILES.get('file')
             if not file:
                 self.message_user(request, "No file uploaded", level=40)
-                changelist_url = reverse(
-                    f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
-                )
-                return redirect(changelist_url)
+                return redirect(reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'))
 
             try:
                 df = self._process_uploaded_file(file)
                 return self.process_dataframe(request, df)
-            except Exception as e:
-                self.message_user(
-                    request,
-                    f"Error processing file: {str(e)}",
-                    level=40
-                )
-                changelist_url = reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist')
-                return redirect(changelist_url)
 
-        context = {
-            **self.admin_site.each_context(request),
+            except Exception as e:
+                self.message_user(request, f"Error: {str(e)}", level=40)
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'error': str(e)}, status=400)
+                return redirect(reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'))
+
+        context = self.admin_site.each_context(request)
+        context.update({
             'opts': self.model._meta,
             'title': 'Bulk Upload'
-        }
-        return render(
-            request,
-            self.upload_confirmation_template or 'admin/bulk_upload_form.html',
-            context
-        )
+        })
+        return render(request, self.upload_confirmation_template or 'admin/bulk_upload_form.html', context)
 
     def _handle_bulk_upload(self, request):
         file = request.FILES.get('file')
@@ -146,6 +137,7 @@ class BulkActionMixin:
 
 # Concrete Admin Classes
 class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
+    change_list_template = "admin/ai_models/transaction/change_list.html"
     list_display = ['get_user_id', 'TransactionId', 'TransactionTime', 'ItemDescription',
                     'NumberOfItemsPurchased', 'CostPerItem', 'Country', 'uploaded_at']
     show_delete_all = True  # Set to True
@@ -156,42 +148,60 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
     get_user_id.short_description = 'User ID'
     get_user_id.admin_order_field = 'user__UserId'
 
-    def process_dataframe(self, request, df):
-        required_columns = {'UserId', 'TransactionId', 'TransactionTime', 'ItemCode',
-                            'ItemDescription', 'NumberOfItemsPurchased', 'CostPerItem', 'Country'}
-        self._validate_columns(df, required_columns)
-
-        transactions = []
-        customer_cache = {}
-        for _, row in df.iterrows():
+    def bulk_upload_view(self, request):
+        if request.method == 'POST':
             try:
-                user_id = str(row['UserId']).strip()
-                if user_id not in customer_cache:
-                    customer_cache[user_id] = CustomerDetail.objects.get(UserId=user_id)
+                # Your existing processing code
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'status': 'processing'})
 
-                transactions.append(Transaction(
-                    user=customer_cache[user_id],
-                    TransactionId=str(row['TransactionId']).strip(),
-                    TransactionTime=pd.to_datetime(row['TransactionTime']),
-                    ItemCode=str(row['ItemCode']).strip(),
-                    ItemDescription=str(row['ItemDescription']),
-                    NumberOfItemsPurchased=int(row['NumberOfItemsPurchased']),
-                    CostPerItem=float(row['CostPerItem']),
-                    Country=str(row['Country']).strip()
-                ))
-            except CustomerDetail.DoesNotExist:
-                self.message_user(request, f"Skipped transaction {row['TransactionId']} - User ID {user_id} not found",
-                                  level=40)
+                # After successful processing
+                return JsonResponse({'message': 'Job completed successfully'})
+
             except Exception as e:
-                self.message_user(request, f"Error with transaction {row.get('TransactionId', 'N/A')}: {str(e)}",
-                                  level=40)
+                return JsonResponse({'error': str(e)}, status=400)
 
-        if transactions:
-            Transaction.objects.bulk_create(transactions)
-            self.message_user(request, f"Imported {len(transactions)} transactions successfully", level=25)
-            generate_forecast()
-            predict_future_sales()
+        return super().bulk_upload_view(request)
+    def process_dataframe(self, request, df):
+        try:
+            required_columns = {'UserId', 'TransactionId', 'TransactionTime', 'ItemCode',
+                                'ItemDescription', 'NumberOfItemsPurchased', 'CostPerItem', 'Country'}
+            self._validate_columns(df, required_columns)
 
+            transactions = []
+            customer_cache = {}
+            for _, row in df.iterrows():
+                try:
+                    user_id = str(row['UserId']).strip()
+                    if user_id not in customer_cache:
+                        customer_cache[user_id] = CustomerDetail.objects.get(UserId=user_id)
+
+                    transactions.append(Transaction(
+                        user=customer_cache[user_id],
+                        TransactionId=str(row['TransactionId']).strip(),
+                        TransactionTime=pd.to_datetime(row['TransactionTime']),
+                        ItemCode=str(row['ItemCode']).strip(),
+                        ItemDescription=str(row['ItemDescription']),
+                        NumberOfItemsPurchased=int(row['NumberOfItemsPurchased']),
+                        CostPerItem=float(row['CostPerItem']),
+                        Country=str(row['Country']).strip()
+                    ))
+                except CustomerDetail.DoesNotExist:
+                    self.message_user(request, f"Skipped transaction {row['TransactionId']} - User ID {user_id} not found",
+                                      level=40)
+                except Exception as e:
+                    self.message_user(request, f"Error with transaction {row.get('TransactionId', 'N/A')}: {str(e)}",
+                                      level=40)
+
+            if transactions:
+                Transaction.objects.bulk_create(transactions)
+                self.message_user(request, f"Imported {len(transactions)} transactions successfully", level=25)
+                generate_forecast()
+                predict_future_sales()
+
+        finally:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'completed'})
         return HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
 
 

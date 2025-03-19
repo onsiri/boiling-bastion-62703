@@ -10,7 +10,7 @@ urlpatterns = [
     path("", include("pages.urls")),
     path("accounts/", include("accounts.urls")),
     path("Products/", include("products.urls")),
-    path("models/", include("ai_models.urls")),
+    path('models/', include(('ai_models.urls', 'ai_models'), namespace='ai_models')),
 ]
 
 if settings.DEBUG:

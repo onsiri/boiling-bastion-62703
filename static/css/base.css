@@ -173,3 +173,51 @@ th .sort-header {
     content: "📤 ";  /* Use emoji or background-image */
     margin-right: 5px;
 }
+
+.product-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* Changed from space-around */
+    gap: 20px; /* Adds consistent spacing between cards */
+    padding: 20px;
+}
+
+.product-card {
+    border: 1px solid #ccc;
+    border-radius: 15px;
+    padding: 15px; /* Reduced padding */
+    margin: 0; /* Remove margin since we're using gap */
+    flex: 0 0 calc(23% - 20px); /* Adjust width and account for gap */
+    box-sizing: border-box; /* Include padding in width calculation */
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: white;
+    transition: transform 0.3s, box-shadow 0.3s;
+    min-height: 300px; /* Optional: Set minimum height for consistency */
+}
+.product-card:hover {
+        transform: scale(1.05); /* Slightly enlarge the card on hover */
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2); /* Darker shadow on hover */
+        }
+        .product-image {
+            max-width: 100%;
+            height: auto;
+        }
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .product-card {
+        flex: 0 0 calc(31% - 20px); /* Wider on medium screens */
+    }
+}
+
+@media (max-width: 768px) {
+    .product-card {
+        flex: 0 0 calc(48% - 20px); /* Two columns on tablets */
+    }
+}
+
+@media (max-width: 480px) {
+    .product-card {
+        flex: 0 0 100%; /* Full width on mobile */
+    }
+}

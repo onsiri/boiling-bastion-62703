@@ -2,35 +2,6 @@
 {% block title %}Products{% endblock title %}
 
 {% block content %}
-    <style>
-
-        .product-grid {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-around;
-            padding: 20px;
-        }
-
-        .product-card {
-            border: 1px solid #ccc;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px;
-            width: 600px;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background-color: white;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .product-card:hover {
-        transform: scale(1.05); /* Slightly enlarge the card on hover */
-        box-shadow: 0 8px 16px rgba(0,0,0,0.2); /* Darker shadow on hover */
-        }
-        .product-image {
-            max-width: 100%;
-            height: auto;
-        }
-    </style>
   <h2>Our Products</h2>
     <div class="product-grid">
     {% for product in products %}
@@ -54,6 +25,9 @@
                 }
                 if (productName === 'BuyerInsight') {
                     window.location.href = '/models/future_sale/';
+                }
+                if (productName === 'Cold Start Prediction') {
+                    window.location.href = '/models/new-recommendations/';
                 }
             });
         });

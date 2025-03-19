@@ -17,7 +17,7 @@ class PurchasePredictor:
         try:
             # Get existing customers with transactions
             existing_customers = CustomerDetail.objects.filter(
-                existing_customer='Yes'
+                existing_customer=True
             ).prefetch_related('transactions')
 
             if not existing_customers.exists():
