@@ -296,6 +296,7 @@ class NextItemPredictionAdmin(admin.ModelAdmin):
 
 
 class NewCustomerRecommendationAdmin(admin.ModelAdmin):
+
     list_display = ['user', 'item_code', 'confidence_score', 'generation_date', 'expiry_date']
     raw_id_fields = ['user']
 

@@ -1,128 +1,155 @@
 {% extends "base.html" %}
-{% block title %}Customer Recommendations{% endblock %}
+{% load static %}
+
 {% block content %}
 <div class="container mt-4">
-    <h2>Customer Recommendations</h2>
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Customer Recommendations</h2>
-        <button class="btn btn-primary" id="generate-recommendations">
+        <button id="generate-recommendations" class="btn btn-primary">
             <i class="bi bi-robot"></i> Generate New Recommendations
         </button>
     </div>
-    <div class="card mb-4">
+
+    <!-- Filter Form -->
+    <form id="recommendation-filter" class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="number" name="min_age" class="form-control" placeholder="Minimum Age">
+            </div>
+            <div class="col-md-4">
+                <select name="gender" class="form-select">
+                    <option value="">All Genders</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-outline-secondary">Filter</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Recommendations Table -->
+    <div id="recommendation-table" class="card shadow-sm">
         <div class="card-body">
-            <form id="recommendation-filter" method="GET" class="form-inline">
-                <div class="row g-3">
-                    <div class="col-md-2">
-                        <input type="text" class="form-control" name="user_filter"
-                               value="{{ filters.user_filter }}" placeholder="User ID">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="text" class="form-control" name="item_filter"
-                               value="{{ filters.item_filter }}" placeholder="Item Code">
-                    </div>
-                    <div class="col-md-2">
-                        <select class="form-select" name="rec_type">
-                            <option value="">All Types</option>
-                            {% for code, name in rec_types %}
-                            <option value="{{ code }}" {% if filters.rec_type == code %}selected{% endif %}>
-                                {{ name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <input type="number" step="0.01" min="0" max="1" class="form-control"
-                               name="min_confidence" value="{{ filters.min_confidence }}" placeholder="Min Confidence">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="number" step="0.01" min="0" max="1" class="form-control"
-                               name="max_confidence" value="{{ filters.max_confidence }}" placeholder="Max Confidence">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" class="form-control" name="start_date"
-                               value="{{ filters.start_date }}" placeholder="From Date">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" class="form-control" name="end_date"
-                               value="{{ filters.end_date }}" placeholder="To Date">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" class="form-control" name="expiry_date"
-                               value="{{ filters.expiry_date }}" placeholder="Expiry Before">
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">Apply</button>
-                    </div>
-                    <div class="col-md-2">
-                        <button type="button" class="btn btn-outline-secondary w-100"
-                                onclick="clearRecommendationFilters()">Clear</button>
-                    </div>
-                </div>
-            </form>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th><a href="?sort=customer_id" class="rec-sort-header">Customer ID</a></th>
+                            <th><a href="?sort=name" class="rec-sort-header">Name</a></th>
+                            <th><a href="?sort=predicted_interest" class="rec-sort-header">Interest Score</a></th>
+                            <th>Recommended Products</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for recommendation in recommendations %}
+                        <tr>
+                            <td>{{ recommendation.customer_id }}</td>
+                            <td>{{ recommendation.name }}</td>
+                            <td>{{ recommendation.predicted_interest|floatformat:2 }}</td>
+                            <td>
+                                {% for product in recommendation.products %}
+                                <span class="badge bg-primary me-1">{{ product }}</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">No recommendations found. Generate some first!</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-
-    <div id="recommendation-table">
-        {% include "ai_models/new_customer_recommendations_table.html" %}
-    </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-\$(document).ready(function() {
-    \$('#generate-recommendations').click(function() {
-        const btn = \$(this);
-        btn.prop('disabled', true);
-        btn.html('<span class="spinner-border spinner-border-sm" role="status"></span> Generating...');
-
-        \$.ajax({
-            url: "{% url 'ai_models:generate_recommendations' %}",
-            method: 'POST',
-            headers: {'X-CSRFToken': '{{ csrf_token }}'},
-            dataType: 'json'
-        })
-        .done(function(response) {
-            if(response.status === 'success') {
-                alert('Success: ' + response.message);
-                window.location.reload();  // Refresh to show new recommendations
-            } else {
-                alert('Error: ' + response.message);
-            }
-        })
-        .fail(function(xhr) {
-            alert('Request failed: ' + xhr.responseText);
-        })
-        .always(function() {
-            btn.prop('disabled', false);
-            btn.html('<i class="bi bi-robot"></i> Generate New Recommendations');
-        });
-    });
-});
 document.addEventListener('DOMContentLoaded', function() {
-    // Sorting handler
+    // Generate Recommendations Handler
+    const generateBtn = document.getElementById('generate-recommendations');
+
+    if (generateBtn) {
+        generateBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+
+            fetch("{% url 'ai_models:generate_recommendations' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: \${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if(data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message || 'Unknown error occurred');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error: ' + error.message);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-robot"></i> Generate New Recommendations';
+            });
+        });
+    }
+
+    // Sorting Handler
     document.querySelectorAll('.rec-sort-header').forEach(header => {
         header.addEventListener('click', function(e) {
             e.preventDefault();
-            const sortUrl = this.closest('a').href;
-            fetch(sortUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('recommendation-table').innerHTML = html;
-                    window.history.replaceState(null, null, sortUrl);
-                });
+            const sortUrl = this.href;
+
+            fetch(sortUrl, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('recommendation-table').innerHTML = html;
+                window.history.replaceState(null, null, sortUrl);
+            })
+            .catch(error => console.error('Sorting error:', error));
         });
     });
 
-    // Form submission
+    // Filter Form Handler
     document.getElementById('recommendation-filter').addEventListener('submit', function(e) {
         e.preventDefault();
         const params = new URLSearchParams(new FormData(this));
         window.location.search = params.toString();
     });
-});
 
-function clearRecommendationFilters() {
-    window.location.search = '';
-}
+    // CSRF Cookie Helper
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
 </script>
 {% endblock %}
