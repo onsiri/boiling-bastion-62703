@@ -3,12 +3,19 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Customer Recommendations</h2>
+    <<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Customer Recommendations</h2>
+    <div class="d-flex gap-2">
+
         <button id="generate-recommendations" class="btn btn-primary">
             <i class="bi bi-robot"></i> Generate New Recommendations
         </button>
+        <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+           class="btn btn-success">
+            <i class="bi bi-download"></i> Download Top 1000
+        </a>
     </div>
+</div>
 
     <!-- Filter Form -->
     <form id="recommendation-filter" class="mb-4">
@@ -111,7 +118,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const params = new URLSearchParams(new FormData(this));
         window.location.search = params.toString();
     });
+    document.getElementById('download-btn').addEventListener('click', async function() {
+    // Get the current filter parameters from the URL
+    const urlParams = new URLSearchParams(window.location.search);
 
+    // Get the data from the API
+    const response = await fetch(`?download=true&\${urlParams.toString()}`);
+    const data = await response.json();
+
+    // Convert the data to CSV
+    const csvData = data.map(item => Object.values(item).join(',')).join('\n');
+    const csvHeader = Object.keys(data[0]).join(',');
+    const csv = `\${csvHeader}\n\${csvData}`;
+
+    // Create a blob to hold the CSV data
+    const blob = new Blob([csv], { type: 'text/csv' });
+
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a link to download the CSV file
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'customer-recommendations.csv';
+    a.click();
+
+    // Clean up
+    URL.revokeObjectURL(url);
+});
     // CSRF Cookie Helper
     function getCookie(name) {
         let cookieValue = null;

@@ -5,11 +5,12 @@ from datetime import datetime
 from django.core.exceptions import FieldError
 from urllib.parse import urlencode
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.views.generic import ListView
 from django.db.models import F
+import csv
 def top_30_sale_forecast(request):
     sort_by = request.GET.get('sort_by', 'uploaded_at')
     sort_order = request.GET.get('sort_order', 'desc')
@@ -199,7 +200,30 @@ def customer_recommendations(request):
     recommendations = NewCustomerRecommendation.objects.all().order_by('-confidence_score')
 
     # Add your filter logic here
+    if 'export' in request.GET:
+        # Apply the same filters but get 1000 records
+        queryset = recommendations[:1000]
 
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="customer_recommendations.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Customer ID', 'Item Code', 'Type',
+            'Confidence Score', 'Generated Date', 'Expiry Date'
+        ])
+
+        for rec in queryset:
+            writer.writerow([
+                rec.user.UserId,
+                rec.item_code,
+                rec.get_recommendation_type_display(),
+                rec.confidence_score,
+                rec.generation_date.strftime("%Y-%m-%d %H:%M"),
+                rec.expiry_date.strftime("%Y-%m-%d %H:%M") if rec.expiry_date else ''
+            ])
+
+        return response
     paginator = Paginator(recommendations, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)

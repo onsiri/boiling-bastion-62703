@@ -20,6 +20,7 @@ ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost"
 
 # Trust Heroku's HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = True
 CSRF_TRUSTED_ORIGINS = [
     'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
     'http://localhost:8000'  # For local development
