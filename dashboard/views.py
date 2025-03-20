@@ -1,11 +1,16 @@
-from django.http import JsonResponse
 from django.shortcuts import render
-from ai_models.models import sale_forecast
+from django.http import JsonResponse
 from django.core import serializers
 
-def dashboard_with_pivot(request):
-    return render(request, 'dashboard_with_pivot.html', {})
+from ai_models.models import sale_forecast
 
+def pivot_dashboard(request):
+    # Fetch and serialize data directly in the view
+    dataset = sale_forecast.objects.all()
+    serialized_data = serializers.serialize('json', dataset)
+    return render(request, 'pivot_dashboard.html', {
+        'sales_data': serialized_data  # Pass data to template
+    })
 def pivot_data(request):
     dataset = sale_forecast.objects.all()
     data = serializers.serialize('json', dataset)

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+
+<head>
+    <title>Sales Forecast</title>
+    <script src="https://cdn.flexmonster.com/flexmonster.js"></script>
+</head>
+<body>
+    <h1>Sales Forecast</h1>
+    <div id="pivot-container"></div>
+
+    <script>
+    const rawData = JSON.parse('{{ sales_data|escapejs }}');
+
+    // Transform data to array of objects
+    const processedData = rawData.map(item => ({
+        Date: item.fields.ds,
+        Prediction: item.fields.prediction,
+        LowerBound: item.fields.prediction_lower,
+        UpperBound: item.fields.prediction_upper,
+        UploadedAt: item.fields.uploaded_at
+    }));
+
+    // Configure for flat table view
+    new Flexmonster({
+        container: "#pivot-container",
+        componentFolder: "https://cdn.flexmonster.com/",
+        width: "100%",
+        height: 600,
+        toolbar: true,
+        report: {
+            dataSource: {
+                type: "json",
+                data: processedData,
+                mapping: {
+                    Date: { type: "date.day" },       // Format dates properly
+                    Prediction: { type: "number" },
+                    LowerBound: { type: "number" },
+                    UpperBound: { type: "number" },
+                    UploadedAt: { type: "date" }
+                }
+            },
+            options: {
+                viewType: "grid",  // Show as flat table
+                grid: {
+                    showHeaders: true,
+                    showTotals: false
+                }
+            }
+        }
+    });
+    </script>
+</body>
+{% endblock content %}

@@ -14,25 +14,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'dknalnveioj345n-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'#'django-insecure-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = False#True
 #DEBUG = env.bool("DJANGO_DEBUG", default=False)
 SECURE_HSTS_SECONDS = 300
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
-SECURE_HSTS_PRELOAD = True
+#SECURE_HSTS_PRELOAD = True
 # Trust Heroku's HTTPS
-SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
+#SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
-CSRF_TRUSTED_ORIGINS = [
-    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
-    'http://localhost:8000'  # For local development
-]
+#CSRF_TRUSTED_ORIGINS = [
+#    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
+#    'http://localhost:8000'  # For local development
+#]
 
 # Required for Django 4.0+
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # Application definition
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+#SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
