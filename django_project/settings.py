@@ -20,12 +20,12 @@ SECURE_HSTS_SECONDS = 300
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
 SECURE_HSTS_PRELOAD = True
 # Trust Heroku's HTTPS
-#SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
-#CSRF_TRUSTED_ORIGINS = [
-#    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
-#    'http://localhost:8000'  # For local development
-#]
+CSRF_TRUSTED_ORIGINS = [
+    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
+    'http://localhost:8000'  # For local development
+]
 
 # Required for Django 4.0+
 SESSION_COOKIE_SECURE = True
@@ -53,7 +53,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
