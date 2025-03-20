@@ -13,13 +13,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True#False
-#DEBUG = env.bool("DJANGO_DEBUG", default=False)
+#DEBUG = True#False
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
 
 # Trust Heroku's HTTPS
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
 CSRF_TRUSTED_ORIGINS = [
     'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "pages.apps.PagesConfig",
     "products.apps.ProductsConfig",
     "ai_models.apps.AiModelsConfig",
+    "dashboard"
 ]
 
 MIDDLEWARE = [
@@ -89,11 +90,10 @@ if 'DATABASE_URL' in os.environ:
     DATABASES = {
         'default': dj_database_url.config(
             conn_max_age=600,
-            ssl_require=True  # Enforce SSL for Heroku PostgreSQL
+            ssl_require=True
         )
     }
 else:
-    # Local Docker configuration
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -102,8 +102,15 @@ else:
             'PASSWORD': 'postgres',
             'HOST': 'db',
             'PORT': 5432,
+            'OPTIONS': {
+                'sslmode': 'disable',
+                'ssl': None
+            }
         }
     }
+
+# Temporarily disable SSL redirect for local development
+SECURE_SSL_REDIRECT = False  # Only for local testing!
 
 
 

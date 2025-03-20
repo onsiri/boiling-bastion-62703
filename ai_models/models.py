@@ -56,7 +56,7 @@ class Transaction(models.Model):
         related_name='transactions',
         db_column='UserId'
     )
-    TransactionId = models.CharField(max_length=100)
+    TransactionId = models.CharField(max_length=255)
     TransactionTime = models.CharField(max_length=500)
     ItemCode = models.CharField(max_length=100)
     ItemDescription = models.TextField()
@@ -71,6 +71,9 @@ class Transaction(models.Model):
 
 class NextItemPrediction(models.Model):
     class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['UserId', 'PredictedAt'], name='unique_user_id_and_predicted_at'),
+        ]
         app_label = 'ai_models'
     UserId = models.CharField(max_length=100)
     PredictedItemCode = models.CharField(max_length=100)

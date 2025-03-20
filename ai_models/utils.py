@@ -61,42 +61,29 @@ def generate_forecast():
         )
 
 
-def predict_future_sales():
+
+def predict_future_sales(request):
     try:
-        # Batch processing parameters
         BATCH_SIZE = 1024
         SEQUENCE_LENGTH = 10
         EPOCHS = 5
 
-        # Get transactions with efficient database query
+        # Data preparation
         transactions = Transaction.objects.select_related('user').values(
             'user_id', 'ItemCode'
         ).order_by('user_id', 'TransactionTime')
 
         if not transactions.exists():
-            print("No transactions to process")
-            return
+            return  # Add proper early return handling
 
-        print("Starting prediction processing")
-
-        # Single database query to get all items
         items = Item.objects.all().values('ItemCode', 'ItemDescription', 'CostPerItem')
         item_df = pd.DataFrame(items)
         item_map = item_df.set_index('ItemCode').to_dict('index')
 
-        # Prepare label encoder with all possible items
         label_encoder = LabelEncoder()
-        all_item_codes = item_df['ItemCode'].unique()
-        label_encoder.fit(all_item_codes)
+        label_encoder.fit(item_df['ItemCode'])
 
-        # Prepare data in pandas with vectorized operations
-        df = pd.DataFrame(transactions)
-        df['ItemCodeEncoded'] = label_encoder.transform(df['ItemCode'])
-
-        # Precompute user sequences in a dictionary
-        user_sequences = df.groupby('user_id')['ItemCodeEncoded'].apply(list).to_dict()
-
-        # Model initialization (single instance)
+        # Model setup (initialize once)
         model = Sequential([
             Embedding(input_dim=len(label_encoder.classes_), output_dim=64),
             LSTM(128, return_sequences=False),
@@ -108,87 +95,76 @@ def predict_future_sales():
             metrics=['accuracy']
         )
 
-        predictions = []
-        user_batch = []
-        sequence_batch = []
+        # Prepare all sequences first
+        all_sequences = []
+        df = pd.DataFrame(transactions)
+        df['ItemCodeEncoded'] = label_encoder.transform(df['ItemCode'])
+        user_sequences = df.groupby('user_id')['ItemCodeEncoded'].apply(list).to_dict()
 
-        # Batch processing of users
-        for user_id, sequence in user_sequences.items():
-            if len(sequence) < SEQUENCE_LENGTH:
-                continue
+        # Epoch training loop
+        for epoch in range(EPOCHS):
+            predictions = []
 
-            # Extract sequences using sliding window approach
-            for i in range(len(sequence) - SEQUENCE_LENGTH):
-                seq = sequence[i:i + SEQUENCE_LENGTH]
-                sequence_batch.append(seq[:-1])
-                user_batch.append((user_id, seq[-1]))
+            for user_id, sequence in user_sequences.items():
+                # Sequence processing
+                if len(sequence) < SEQUENCE_LENGTH:
+                    continue
 
-            if len(sequence_batch) >= BATCH_SIZE:
-                # Convert to numpy arrays
-                X = pad_sequences(sequence_batch, maxlen=SEQUENCE_LENGTH - 1)
-                y = np.array([item[1] for item in user_batch])
+                # Sliding window with randomization
+                windows = [
+                    sequence[i:i + SEQUENCE_LENGTH]
+                    for i in range(len(sequence) - SEQUENCE_LENGTH)
+                ]
+                np.random.shuffle(windows)
 
-                # Train on batch
-                model.train_on_batch(X, y)
+                # Batch processing
+                for i in range(0, len(windows), BATCH_SIZE):
+                    batch = windows[i:i + BATCH_SIZE]
+                    X = pad_sequences([seq[:-1] for seq in batch], maxlen=SEQUENCE_LENGTH - 1)
+                    y = np.array([seq[-1] for seq in batch])
 
-                # Generate predictions
-                preds = model.predict(X, batch_size=BATCH_SIZE, verbose=0)
-                predicted_indices = np.argmax(preds, axis=1)
+                    # Train and predict
+                    model.train_on_batch(X, y)
+                    preds = model.predict(X, verbose=0)
 
-                # Process batch predictions
-                for (user_id, _), pred_idx in zip(user_batch, predicted_indices):
-                    item_code = label_encoder.inverse_transform([pred_idx])[0]
-                    predictions.append(NextItemPrediction(
-                        UserId=user_id,
-                        PredictedItemCode=item_code,
-                        PredictedItemDescription=item_map[item_code]['ItemDescription'],
-                        PredictedItemCost=item_map[item_code]['CostPerItem'],
-                        Probability=np.max(preds),
-                        PredictedAt=timezone.now()
-                    ))
+                    # Store predictions
+                    for seq, pred in zip(batch, preds):
+                        pred_idx = np.argmax(pred)
+                        prob = pred[pred_idx]
+                        item_code = label_encoder.inverse_transform([pred_idx])[0]
 
-                sequence_batch = []
-                user_batch = []
+                        predictions.append(NextItemPrediction(
+                            UserId=user_id,
+                            PredictedItemCode=item_code,
+                            PredictedItemDescription=item_map.get(item_code, {}).get('ItemDescription', ''),
+                            PredictedItemCost=item_map.get(item_code, {}).get('CostPerItem', 0),
+                            Probability=float(prob),
+                            PredictedAt=timezone.now()
+                        ))
 
-        # Process remaining items in last batch
-        if sequence_batch:
-            X = pad_sequences(sequence_batch, maxlen=SEQUENCE_LENGTH - 1)
-            y = np.array([item[1] for item in user_batch])
-            model.train_on_batch(X, y)
-            preds = model.predict(X, verbose=0)
-            predicted_indices = np.argmax(preds, axis=1)
+            # Periodic saving
+            if predictions:
+                with transaction.atomic():
+                    NextItemPrediction.objects.bulk_create(
+                        predictions,
+                        batch_size=1000,
+                        update_conflicts=True,
+                        update_fields=[
+                            'PredictedItemCode',
+                            'PredictedItemDescription',
+                            'PredictedItemCost',
+                            'Probability',
+                            'PredictedAt'
+                        ],
+                        unique_fields=['UserId', 'PredictedAt']
+                    )
+                predictions = []
 
-            for (user_id, _), pred_idx in zip(user_batch, predicted_indices):
-                item_code = label_encoder.inverse_transform([pred_idx])[0]
-                predictions.append(NextItemPrediction(
-                    UserId=user_id,
-                    PredictedItemCode=item_code,
-                    PredictedItemDescription=item_map[item_code]['ItemDescription'],
-                    PredictedItemCost=item_map[item_code]['CostPerItem'],
-                    Probability=np.max(preds),
-                    PredictedAt=timezone.now()
-                ))
-
-        # Bulk create predictions
-        with transaction.atomic():
-            NextItemPrediction.objects.bulk_create(
-                predictions,
-                batch_size=1000,
-                update_conflicts=True,
-                update_fields=[
-                    'PredictedItemCode',
-                    'PredictedItemDescription',
-                    'PredictedItemCost',
-                    'Probability',
-                    'PredictedAt'
-                ],
-                unique_fields=['UserId']
-            )
-
-        print(f"Successfully processed {len(predictions)} predictions")
+        return True  # Or return appropriate response
 
     except Exception as e:
-        print(f"Prediction error: {str(e)}")
+        if request:  # Handle CLI vs web context
+            print(f"Critical error: {str(e)}")
         raise
 
 

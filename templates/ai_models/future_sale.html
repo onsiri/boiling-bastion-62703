@@ -2,7 +2,13 @@
 {% block title %}Future Sales Predictions{% endblock %}
 {% block content %}
 <div class="container mt-4">
-    <h2>Customer Purchase Probability</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Customer Purchase Probability</h2>
+        <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+           class="btn btn-success">
+            <i class="bi bi-download"></i> Export to CSV
+        </a>
+    </div>
 
     <!-- Filter Section -->
     <div class="card mb-4">
@@ -45,7 +51,9 @@
                         <button type="submit" class="btn btn-primary w-100">Apply</button>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">Clear</button>
+                        <button type="button" class="btn btn-outline-secondary w-100" id="clear-filters">
+                            Clear
+                        </button>
                     </div>
                 </div>
             </form>
@@ -53,60 +61,58 @@
     </div>
 
     <!-- Table Container -->
-    <div id="table-container">
-        {% include "ai_models/future_sale_table.html" %}
-    </div>
+    {% include "ai_models/future_sale_table.html" %}
 </div>
 
 <script>
-\$(document).ready(function() {
-    // Handle sorting clicks
-    \$(document).on('click', '.sort-header', function(e) {
-        e.preventDefault();
-        const sortUrl = \$(this).data('sort-url');
-        const existingParams = new URLSearchParams(window.location.search);
-
-        // Remove existing sort parameters
-        existingParams.delete('sort_by');
-        existingParams.delete('sort_order');
-
-        // Add new sort parameters
-        const newParams = new URLSearchParams(sortUrl.split('?')[1]);
-        newParams.forEach((value, key) => {
-            existingParams.set(key, value);
-        });
-
-        // Build final URL
-        const finalUrl = window.location.pathname + '?' + existingParams.toString();
-
-        \$.ajax({
-            url: finalUrl,
-            headers: {'X-Requested-With': 'XMLHttpRequest'},
-            success: function(data) {
-                \$('#table-container').html(data);
-                window.history.replaceState(null, null, finalUrl);
-            }
-        });
-    });
-
+document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
-    \$('#filter-form').submit(function(e) {
+    document.getElementById('filter-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        const params = \$(this).serialize();
-        window.location.search = params;
+        const formData = new FormData(this);
+        const params = new URLSearchParams(formData);
+        window.location.search = params.toString();
     });
-});
 
-function clearFilters() {
-    // Completely reset URL and reload
-    const url = window.location.pathname;
-    \$.ajax({
-        url: url,
-        success: function(data) {
-            \$('#table-container').html(data);
-            window.history.replaceState(null, null, url);
+    // Handle clear filters
+    document.getElementById('clear-filters').addEventListener('click', function() {
+        window.location.search = '';
+    });
+
+    // Update sorting links to preserve existing parameters
+    document.querySelectorAll('.sort-header').forEach(header => {
+        header.addEventListener('click', function(e) {
+            e.preventDefault();
+            const currentParams = new URLSearchParams(window.location.search);
+            const linkParams = new URLSearchParams(this.href.split('?')[1]);
+
+            // Merge parameters
+            linkParams.forEach((value, key) => currentParams.set(key, value));
+
+            // Remove page number when sorting changes
+            currentParams.delete('page');
+
+            window.location.search = currentParams.toString();
+        });
+    });
+
+    // Update pagination links to preserve filters
+    document.querySelectorAll('.page-link').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href) {
+            const params = new URLSearchParams(href.split('?')[1]);
+            const currentParams = new URLSearchParams(window.location.search);
+
+            // Preserve existing parameters except page
+            currentParams.forEach((value, key) => {
+                if (key !== 'page' && !params.has(key)) {
+                    params.set(key, value);
+                }
+            });
+
+            link.setAttribute('href', `?\${params.toString()}`);
         }
     });
-}
+});
 </script>
 {% endblock %}

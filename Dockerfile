@@ -23,4 +23,4 @@ EXPOSE 8000
 #RUN python manage.py collectstatic --noinput
 
 # Run the command to start the Gunicorn server
-CMD ["gunicorn", "myproject.wsgi:application", "--workers", "3", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "django_project.wsgi:application", "--workers", "3", "--bind", "0.0.0.0:8000"]

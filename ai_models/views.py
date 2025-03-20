@@ -7,37 +7,64 @@ from urllib.parse import urlencode
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse, HttpResponse
 from django.core.management import call_command
-from django.core.paginator import Paginator
 from django.views.generic import ListView
 from django.db.models import F
 import csv
-def top_30_sale_forecast(request):
-    sort_by = request.GET.get('sort_by', 'uploaded_at')
-    sort_order = request.GET.get('sort_order', 'desc')
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import F
 
-    order_by_field = sort_by
-    if sort_order == 'asc':
-        order_by_field = f'{sort_by}'
-    else:
-        order_by_field = f'-{sort_by}'
+
+
+def top_30_sale_forecast(request):
+    # Default sorting values
+    default_sort = 'uploaded_at'
+    default_order = 'desc'
+
+    # Get sort parameters from request
+    sort_by = request.GET.get('sort_by', default_sort)
+    sort_order = request.GET.get('sort_order', default_order)
+
+    # Validate sort parameters
+    valid_sort_fields = {'ds', 'prediction', 'prediction_lower', 'prediction_upper', 'uploaded_at'}
+    if sort_by not in valid_sort_fields:
+        sort_by = default_sort
+        sort_order = default_order
+
+    # Create order_by expression
+    order_prefix = '-' if sort_order == 'desc' else ''
+    order_by = f'{order_prefix}{sort_by}'
 
     try:
-        top_30_items = sale_forecast.objects.annotate(
-            date_ds=F('ds')
-        ).order_by(order_by_field)[:30]
+        # Base query with sorting
+        base_query = sale_forecast.objects.all().order_by(order_by)
     except FieldError:
-        top_30_items = sale_forecast.objects.order_by('-uploaded_at')[:30]
+        # Fallback to default sorting if there's any field error
+        base_query = sale_forecast.objects.all().order_by(f'-{default_sort}')
 
-    # Convert 'ds' to datetime for proper sorting if needed
-    if sort_by == 'ds':
-        top_30_items = sorted(top_30_items, key=lambda x: datetime.strptime(x.ds, '%Y-%m-%d') if x.ds else None)
+    # Pagination setup
+    items_per_page = 20
+    paginator = Paginator(base_query, items_per_page)
+    page_number = request.GET.get('page')
 
-    return render(request, 'ai_models/top_30_sale_forecast.html', {
-        'top_30_items': top_30_items,
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    context = {
+        'page_obj': page_obj,
         'sort_by': sort_by,
         'sort_order': sort_order,
-    })
+        'request': request
+    }
 
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'ai_models/top_30_sale_forecast.html', context)
+
+    return render(request, 'ai_models/top_30_sale_forecast.html', context)
 
 
 def future_sale_prediction(request):
@@ -84,8 +111,8 @@ def future_sale_prediction(request):
 
     # Sorting configuration
     valid_sort_fields = ['UserId', 'PredictedAt', 'Probability',
-                        'PredictedItemDescription', 'PredictedItemCost']
-    sort_by = request.GET.get('sort_by', 'Probability')  # Changed default to visible column
+                         'PredictedItemDescription', 'PredictedItemCost']
+    sort_by = request.GET.get('sort_by', 'Probability')
     sort_order = request.GET.get('sort_order', 'desc')
 
     # Validate sorting parameters
@@ -100,8 +127,19 @@ def future_sale_prediction(request):
     # Apply sorting with Probability as secondary sort
     ordered = base_query.order_by(order_by, '-Probability')
 
+    # Pagination
+    paginator = Paginator(ordered, 20)  # 25 items per page
+    page_number = request.GET.get('page')
+
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
     context = {
-        'future_sale': ordered,
+        'page_obj': page_obj,
         'sort_by': sort_by,
         'sort_order': sort_order,
         'filters': filters,
@@ -112,7 +150,6 @@ def future_sale_prediction(request):
         return render(request, 'ai_models/future_sale_table.html', context)
 
     return render(request, 'ai_models/future_sale.html', context)
-
 
 def new_customer_recommendations(request):
     # Filter parameters

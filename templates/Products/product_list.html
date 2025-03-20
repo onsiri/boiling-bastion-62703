@@ -19,17 +19,19 @@
 
         productCards.forEach(function(card) {
             card.addEventListener('click', function() {
-                var productName = this.getAttribute('data-product-name');
-                if (productName === 'Sale Forecast') {
+                var productName = this.getAttribute('data-product-name').trim();
+                console.log('Clicked product:', productName);
+                // Normalize the comparison
+                if (productName.toLowerCase() === 'sale forecast') {
                     window.location.href = '/models/top-30-sale-forecast/';
                 }
-                if (productName === 'BuyerInsight') {
+                else if (productName.toLowerCase() === 'buyerinsight') {
                     window.location.href = '/models/future_sale/';
                 }
-                if (productName === 'Cold Start Prediction') {
+                else if (productName.toLowerCase() === 'cold start prediction') {
                     window.location.href = '/models/customer-recommendations/';
                 }
-            });
+            }); // Fixed the syntax error here
         });
     });
 </script>

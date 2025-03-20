@@ -151,14 +151,16 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
     def bulk_upload_view(self, request):
         if request.method == 'POST':
             try:
-                # Your existing processing code
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({'status': 'processing'})
+                # Remove the premature AJAX response check
+                file = request.FILES.get('file')
+                if not file:
+                    return JsonResponse({'error': 'No file uploaded'}, status=400)
 
-                # After successful processing
-                return JsonResponse({'message': 'Job completed successfully'})
+                df = self._process_uploaded_file(file)
+                return self.process_dataframe(request, df)
 
             except Exception as e:
+                self.message_user(request, f"Error: {str(e)}", level=messages.ERROR)
                 return JsonResponse({'error': str(e)}, status=400)
 
         return super().bulk_upload_view(request)
@@ -194,10 +196,25 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                                       level=40)
 
             if transactions:
-                Transaction.objects.bulk_create(transactions)
+                try:
+                    Transaction.objects.bulk_create(transactions)
+                except Exception as e:
+                    self.message_user(request, f"Error creating transactions: {str(e)}", level=40)
+                    return JsonResponse({'error': str(e)}, status=400)
+
+                try:
+                    generate_forecast()
+                except Exception as e:
+                    self.message_user(request, f"Error generating forecast: {str(e)}", level=40)
+
+                try:
+                    predict_future_sales(request)
+                except Exception as e:
+                    self.message_user(request, f"Error predicting future sales: {str(e)}", level=40)
+                    # Consider re-raising the exception to prevent the successful response
+                    # raise
+
                 self.message_user(request, f"Imported {len(transactions)} transactions successfully", level=25)
-                generate_forecast()
-                predict_future_sales()
 
         finally:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':

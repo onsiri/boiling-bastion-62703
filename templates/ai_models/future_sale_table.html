@@ -1,56 +1,73 @@
-<table class="table table-hover">
-    <thead class="thead-light">
-        <tr>
-            <th>
-                <a href="?sort_by=UserId&sort_order={% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
-                   class="sort-link">
-                    <div class="sort-header">
-                        USERID
-                        <span class="sort-indicator {% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
-                    </div>
-                </a>
-            </th>
-            <th>
-                <a href="?sort_by=PredictedItemDescription&sort_order={% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
-                   class="sort-link">
-                    <div class="sort-header">
-                        Item Description
-                        <span class="sort-indicator {% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
-                    </div>
-                </a>
-            </th>
-            <th>
-                <a href="?sort_by=Probability&sort_order={% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
-                   class="sort-link">
-                    <div class="sort-header">
-                        Probability (%)
-                        <span class="sort-indicator {% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
-                    </div>
-                </a>
-            </th>
-            <th>
-                <a href="?sort_by=PredictedItemCost&sort_order={% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}"
-                   class="sort-link">
-                    <div class="sort-header">
-                        Item Cost
-                        <span class="sort-indicator {% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
-                    </div>
-                </a>
-            </th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in future_sale %}
-        <tr>
-            <td>{{ item.UserId }}</td>
-            <td>{{ item.PredictedItemDescription }}</td>
-            <td>{{ item.Probability|floatformat:2 }}%</td>
-            <td>${{ item.PredictedItemCost }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="4" class="text-center">No predictions found</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div id="recommendation-table" class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th><a href="?sort_by=UserId&sort_order={% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">User ID</a></th>
+                        <th><a href="?sort_by=PredictedItemDescription&sort_order={% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Item Description</a></th>
+                        <th><a href="?sort_by=Probability&sort_order={% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Probability</a></th>
+                        <th><a href="?sort_by=PredictedItemCost&sort_order={% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Item Cost</a></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj %}
+                        <tr>
+                            <td>{{ item.UserId }}</td>
+                            <td>{{ item.PredictedItemDescription }}</td>
+                            <td>{{ item.Probability|floatformat:2 }}%</td>
+                            <td>\${{ item.PredictedItemCost }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">No predictions found</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <div class="pagination mt-4">
+                <ul class="pagination-list d-flex flex-wrap gap-2 list-unstyled">
+                    {% if page_obj.has_previous %}
+                        <li>
+                            <a href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">&laquo;</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">Prev</a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li>
+                                <span class="page-link active">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                            <li>
+                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">{{ num }}</a>
+                            </li>
+                        {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                            <li>
+                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">{{ num }}</a>
+                            </li>
+                        {% elif num == page_obj.number|add:-3 or num == page_obj.number|add:3 %}
+                            <li class="disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li>
+                            <a href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">Next</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">&raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
