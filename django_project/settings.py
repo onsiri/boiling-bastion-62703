@@ -1,3 +1,4 @@
+from importlib.metadata import FastPath
 
 import dj_database_url
 from pathlib import Path
@@ -10,14 +11,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'
+SECRET_KEY = 'dknalnveioj345n-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'#'django-insecure-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True#False
-DEBUG = env.bool("DJANGO_DEBUG", default=False)
-
+DEBUG = False
+#DEBUG = env.bool("DJANGO_DEBUG", default=False)
+SECURE_HSTS_SECONDS = 300
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
-
+SECURE_HSTS_PRELOAD = True
 # Trust Heroku's HTTPS
 SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
@@ -31,7 +32,7 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # Application definition
-
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -109,8 +110,9 @@ else:
         }
     }
 
-# Temporarily disable SSL redirect for local development
-SECURE_SSL_REDIRECT = False  # Only for local testing!
+
+
+# Path to your self-signed certificate and private key
 
 
 
