@@ -18,7 +18,7 @@ DEBUG = False#True
 #DEBUG = env.bool("DJANGO_DEBUG", default=False)
 SECURE_HSTS_SECONDS = 300
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
-#SECURE_HSTS_PRELOAD = True
+SECURE_HSTS_PRELOAD = True
 # Trust Heroku's HTTPS
 #SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
@@ -32,7 +32,7 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # Application definition
-#SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
