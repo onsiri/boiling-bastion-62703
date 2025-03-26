@@ -2,17 +2,34 @@
 {% block content %}
 
 <head>
-    <title>Sales Forecast</title>
+    <title>Sales Forecast Analytics</title>
     <script src="https://cdn.flexmonster.com/flexmonster.js"></script>
+    <style>
+        .dashboard-section {
+            margin-bottom: 40px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Sales Forecast</h1>
-    <div id="pivot-container"></div>
+    <div class="dashboard-section">
+        <h2>Raw Data View</h2>
+        <div id="grid-view"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>Sales Trend Over Time</h2>
+        <div id="line-chart"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>Prediction Distribution</h2>
+        <div id="pie-chart"></div>
+    </div>
 
     <script>
     const rawData = JSON.parse('{{ sales_data|escapejs }}');
-
-    // Transform data to array of objects
     const processedData = rawData.map(item => ({
         Date: item.fields.ds,
         Prediction: item.fields.prediction,
@@ -21,30 +38,87 @@
         UploadedAt: item.fields.uploaded_at
     }));
 
-    // Configure for flat table view
+    // Common data source configuration
+    const commonDataSource = {
+        type: "json",
+        data: processedData,
+        mapping: {
+            Date: { type: "date.day" },
+            Prediction: { type: "number" },
+            LowerBound: { type: "number" },
+            UpperBound: { type: "number" },
+            UploadedAt: { type: "date" }
+        }
+    };
+
+    // 1. Grid View Configuration
     new Flexmonster({
-        container: "#pivot-container",
+        container: "#grid-view",
         componentFolder: "https://cdn.flexmonster.com/",
-        width: "100%",
-        height: 600,
+        width: "30%",
+        height: 400,
         toolbar: true,
         report: {
-            dataSource: {
-                type: "json",
-                data: processedData,
-                mapping: {
-                    Date: { type: "date.day" },       // Format dates properly
-                    Prediction: { type: "number" },
-                    LowerBound: { type: "number" },
-                    UpperBound: { type: "number" },
-                    UploadedAt: { type: "date" }
-                }
-            },
+            dataSource: commonDataSource,
             options: {
-                viewType: "grid",  // Show as flat table
+                viewType: "grid",
                 grid: {
                     showHeaders: true,
                     showTotals: false
+                }
+            }
+        }
+    });
+
+    // 2. Line Chart Configuration
+    new Flexmonster({
+        container: "#line-chart",
+        componentFolder: "https://cdn.flexmonster.com/",
+        width: "70%",
+        height: 400,
+        toolbar: true,
+        report: {
+            dataSource: commonDataSource,
+            slice: {
+                rows: [{
+                    uniqueName: "Date"
+                }],
+                measures: [{
+                    uniqueName: "Prediction",
+                    aggregation: "sum"
+                }]
+            },
+            options: {
+                viewType: "charts",
+                chart: {
+                    type: "line"
+                }
+            }
+        }
+    });
+
+    // 3. Pie Chart Configuration
+    new Flexmonster({
+        container: "#pie-chart",
+        componentFolder: "https://cdn.flexmonster.com/",
+        width: "100%",
+        height: 400,
+        toolbar: true,
+        report: {
+            dataSource: commonDataSource,
+            slice: {
+                measures: [{
+                    uniqueName: "Prediction",
+                    aggregation: "sum"
+                }],
+                rows: [{
+                    uniqueName: "UploadedAt.month"
+                }]
+            },
+            options: {
+                viewType: "charts",
+                chart: {
+                    type: "pie"
                 }
             }
         }

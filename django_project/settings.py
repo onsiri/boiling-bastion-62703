@@ -1,38 +1,40 @@
-from importlib.metadata import FastPath
-
+from dotenv import load_dotenv
+import django_plotly_dash
+# Load environment variables before using them
+ # Looks for .env in project root by default
 import dj_database_url
 from pathlib import Path
 import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'dknalnveioj345n-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'#'django-insecure-&2)vv83))1x=-lvagx6sw2)vrouhb-9-6r42f5)dfr^k335%iz'
-
-# SECURITY WARNING: don't run with debug turned on in production!`
-DEBUG = False#True
-#DEBUG = env.bool("DJANGO_DEBUG", default=False)
-SECURE_HSTS_SECONDS = 300
 ALLOWED_HOSTS = ["boiling-bastion-62703-1fb7e4016adf.herokuapp.com", "localhost", "127.0.0.1"]
-SECURE_HSTS_PRELOAD = True
+# SECURITY WARNING: don't run with debug turned on in production!`
+DEBUG = True
+#DEBUG = env.bool("DJANGO_DEBUG", default=False)
+#SECURE_HSTS_SECONDS = 300
+
+#SECURE_HSTS_PRELOAD = True
 # Trust Heroku's HTTPS
-SECURE_PROXY_SSL_HEADER =  ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = True
-CSRF_TRUSTED_ORIGINS = [
-    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
-    'http://localhost:8000'  # For local development
-]
+SECURE_PROXY_SSL_HEADER =  None#('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False
+#CSRF_TRUSTED_ORIGINS = [
+#    'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
+#    'http://localhost:8000'  # For local development
+#]
 
 # Required for Django 4.0+
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+#SESSION_COOKIE_SECURE = True
+#CSRF_COOKIE_SECURE = True
 
 # Application definition
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+#SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -48,7 +50,9 @@ INSTALLED_APPS = [
     "pages.apps.PagesConfig",
     "products.apps.ProductsConfig",
     "ai_models.apps.AiModelsConfig",
-    "dashboard"
+    "dashboard",
+    'django_plotly_dash',
+
 ]
 
 MIDDLEWARE = [
@@ -60,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",  # new
+    "django_plotly_dash.middleware.BaseMiddleware",
 
 ]
 
@@ -154,7 +159,7 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [ os.path.join(BASE_DIR, 'static'),]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
@@ -177,7 +182,17 @@ if 'DATABASE_URL' in os.environ:
     AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME = 'us-east-1'  # Your bucket's region
     AWS_QUERYSTRING_AUTH = False  # Avoid auth query params for URLs
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = 'private'
+
 else:
     # Local settings
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     # You can remove the AWS settings here, as they're not needed
+
+PLOTLY_COMPONENTS = [
+    'dash_core_components',
+    'dash_html_components',
+    'dash_renderer',
+    'dpd_components',
+]

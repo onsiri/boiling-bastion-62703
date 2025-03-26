@@ -2,7 +2,7 @@
 {% block title %}Products{% endblock title %}
 
 {% block content %}
-  <h2>Our Products</h2>
+
     <div class="product-grid">
     {% for product in products %}
         <div class="product-card" data-product-name="{{ product.product_name }}">
@@ -22,13 +22,13 @@
                 var productName = this.getAttribute('data-product-name').trim();
                 console.log('Clicked product:', productName);
                 // Normalize the comparison
-                if (productName.toLowerCase() === 'sale forecast') {
+                if (productName.toLowerCase() === ('sale forecast').toLowerCase()){
                     window.location.href = '/models/top-30-sale-forecast/';
                 }
-                else if (productName.toLowerCase() === 'buyerinsight') {
+                else if (productName.toLowerCase() === ('Personalized Predictions').toLowerCase()) {
                     window.location.href = '/models/future_sale/';
                 }
-                else if (productName.toLowerCase() === 'cold start prediction') {
+                else if (productName.toLowerCase() === ('cold start prediction').toLowerCase()) {
                     window.location.href = '/models/customer-recommendations/';
                 }
             }); // Fixed the syntax error here

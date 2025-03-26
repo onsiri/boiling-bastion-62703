@@ -12,9 +12,10 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("pages.urls")),
     path("accounts/", include("accounts.urls")),
-    path("Products/", include("products.urls")),
+    path("products/", include("products.urls")),
     path('models/', include(('ai_models.urls', 'ai_models'), namespace='ai_models')),
     path('dashboard/', include('dashboard.urls')),
+    path('django_plotly_dash/', include('django_plotly_dash.urls', namespace='django_plotly_dash')),
 
 ]
 

@@ -5,8 +5,8 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
-from .utils import generate_forecast, predict_future_sales
-
+from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3
+import numpy as np
 
 class BulkActionMixin:
     # Bulk delete configuration
@@ -140,8 +140,9 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
     change_list_template = "admin/ai_models/transaction/change_list.html"
     list_display = ['get_user_id', 'TransactionId', 'TransactionTime', 'ItemDescription',
                     'NumberOfItemsPurchased', 'CostPerItem', 'Country', 'uploaded_at']
-    show_delete_all = True  # Set to True
+    show_delete_all = True
     show_upload = True
+
     def get_user_id(self, obj):
         return obj.user.UserId
 
@@ -151,75 +152,129 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
     def bulk_upload_view(self, request):
         if request.method == 'POST':
             try:
-                # Remove the premature AJAX response check
                 file = request.FILES.get('file')
                 if not file:
                     return JsonResponse({'error': 'No file uploaded'}, status=400)
 
                 df = self._process_uploaded_file(file)
                 return self.process_dataframe(request, df)
-
             except Exception as e:
                 self.message_user(request, f"Error: {str(e)}", level=messages.ERROR)
                 return JsonResponse({'error': str(e)}, status=400)
-
         return super().bulk_upload_view(request)
+
     def process_dataframe(self, request, df):
+        response = None
         try:
+            # Validate required columns first
             required_columns = {'UserId', 'TransactionId', 'TransactionTime', 'ItemCode',
                                 'ItemDescription', 'NumberOfItemsPurchased', 'CostPerItem', 'Country'}
             self._validate_columns(df, required_columns)
 
+            # Convert UserIds to strings and clean
+            df['UserId'] = df['UserId'].astype(str).str.strip()
+
+            # Get existing users in bulk with cleaned UserIds
+            existing_users = CustomerDetail.objects.filter(
+                UserId__in=df['UserId'].unique()
+            ).in_bulk(field_name='UserId')
+
+            # Prepare data
+            df['TransactionTime'] = pd.to_datetime(df['TransactionTime']).dt.tz_localize(None)
+            df = df.replace({np.nan: None})
             transactions = []
-            customer_cache = {}
-            for _, row in df.iterrows():
+            errors = []
+            missing_users = set()
+
+            # Process records with validation
+            for row in df.itertuples(index=True):
                 try:
-                    user_id = str(row['UserId']).strip()
-                    if user_id not in customer_cache:
-                        customer_cache[user_id] = CustomerDetail.objects.get(UserId=user_id)
+                    user_id = row.UserId
+
+                    # Validate user exists
+                    if user_id not in existing_users:
+                        missing_users.add(user_id)
+                        raise ValueError(f"User {user_id} not found")
+
+                    # Validate numeric fields
+                    try:
+                        num_items = int(row.NumberOfItemsPurchased)
+                        cost = float(row.CostPerItem)
+                    except ValueError as e:
+                        raise ValueError(f"Invalid numeric value: {str(e)}")
 
                     transactions.append(Transaction(
-                        user=customer_cache[user_id],
-                        TransactionId=str(row['TransactionId']).strip(),
-                        TransactionTime=pd.to_datetime(row['TransactionTime']),
-                        ItemCode=str(row['ItemCode']).strip(),
-                        ItemDescription=str(row['ItemDescription']),
-                        NumberOfItemsPurchased=int(row['NumberOfItemsPurchased']),
-                        CostPerItem=float(row['CostPerItem']),
-                        Country=str(row['Country']).strip()
+                        user=existing_users[user_id],  # Use actual CustomerDetail instance
+                        TransactionId=str(row.TransactionId).strip(),
+                        TransactionTime=row.TransactionTime,
+                        ItemCode=str(row.ItemCode).strip(),
+                        ItemDescription=str(row.ItemDescription),
+                        NumberOfItemsPurchased=num_items,
+                        CostPerItem=cost,
+                        Country=str(row.Country).strip()
                     ))
-                except CustomerDetail.DoesNotExist:
-                    self.message_user(request, f"Skipped transaction {row['TransactionId']} - User ID {user_id} not found",
-                                      level=40)
                 except Exception as e:
-                    self.message_user(request, f"Error with transaction {row.get('TransactionId', 'N/A')}: {str(e)}",
-                                      level=40)
+                    errors.append(f"Row {row.Index}: {str(e)}")
 
+            # Handle missing users error
+            if missing_users:
+                error_msg = f"Missing users: {', '.join(sorted(missing_users)[:5])}"
+                if len(missing_users) > 5:
+                    error_msg += f"... ({len(missing_users) - 5} more)"
+                self.message_user(request, error_msg, level=messages.ERROR)
+
+            # Bulk create transactions
+            created_count = 0
             if transactions:
-                try:
-                    Transaction.objects.bulk_create(transactions)
-                except Exception as e:
-                    self.message_user(request, f"Error creating transactions: {str(e)}", level=40)
-                    return JsonResponse({'error': str(e)}, status=400)
+                created_objs = Transaction.objects.bulk_create(
+                    transactions,
+                    batch_size=2000,
+                    ignore_conflicts=True
+                )
+                created_count = len(created_objs)
+            messages = []
+            if created_count:
+                messages.append(f"Successfully imported {created_count} transactions")
+            # Handle analytics
 
-                try:
-                    generate_forecast()
-                except Exception as e:
-                    self.message_user(request, f"Error generating forecast: {str(e)}", level=40)
+            analytics_errors = []
+            try:
+                print("start generate_forecast function")
+                import_forecasts_from_s3()
+            except Exception as e:
+                analytics_errors.append(f"Forecast error: {str(e)}")
 
-                try:
-                    predict_future_sales(request)
-                except Exception as e:
-                    self.message_user(request, f"Error predicting future sales: {str(e)}", level=40)
-                    # Consider re-raising the exception to prevent the successful response
-                    # raise
+            try:
+                predict_future_sales(request)
+            except Exception as e:
+                analytics_errors.append(f"Sales prediction error: {str(e)}")
 
-                self.message_user(request, f"Imported {len(transactions)} transactions successfully", level=25)
+            # Prepare response
+
+            if errors:
+                messages.append(f"Encountered {len(errors)} errors (first 3: {', '.join(errors[:3])})")
+            if analytics_errors:
+                messages.append(f"Analytics issues: {', '.join(analytics_errors)}")
+
+            status_level = messages.SUCCESS if created_count else messages.WARNING
+            self.message_user(request, ". ".join(messages), level=status_level)
+
+            response_data = {
+                'created': created_count,
+                'errors': len(errors),
+                'warnings': len(analytics_errors),
+                'missing_users': list(missing_users)[:10]
+            }
+            response = JsonResponse(response_data)
+
+        except Exception as e:
+            self.message_user(request, f"Processing failed: {str(e)}", level=messages.ERROR)
+            response = JsonResponse({'error': str(e)}, status=400)
 
         finally:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'completed'})
-        return HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
+                return response or JsonResponse({'status': 'completed'})
+            return response or HttpResponseRedirect(reverse('admin:ai_models_transaction_changelist'))
 
 
 class ItemAdmin(BulkActionMixin, admin.ModelAdmin):
@@ -305,7 +360,7 @@ class CustomerDetailsAdmin(BulkActionMixin, admin.ModelAdmin):
 
 # Standard Admins
 class SaleForecastAdmin(admin.ModelAdmin):
-    list_display = ['ds', 'prediction', 'prediction_lower', 'prediction_upper', 'uploaded_at']
+    list_display = ['ds', 'country', 'prediction', 'prediction_lower', 'prediction_upper', 'accuracy_score' ,'uploaded_at']
 
 
 class NextItemPredictionAdmin(admin.ModelAdmin):
