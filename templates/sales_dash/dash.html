@@ -1,0 +1,14 @@
+{% load plotly_dash %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Forecast Dashboard</title>
+    {% plotly_header %}
+</head>
+<body>
+    <div class="container">
+        {% plotly_direct name="SalesForecast" %}
+    </div>
+    {% plotly_footer %}
+</body>
+</html>
