@@ -6,7 +6,7 @@ class AiModelsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "ai_models"
 
-    #def ready(self):
-    # Connect the signal handler using a decorator
-    from . import signals  # Import signals module to register handlers
+    def ready(self):
+        # Import signals inside ready() to avoid circular imports
+        from . import signals  # This registers your signal handlers
 

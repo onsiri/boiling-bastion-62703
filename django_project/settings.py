@@ -19,7 +19,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = [
     "boiling-bastion-62703-1fb7e4016adf.herokuapp.com",
     "localhost",
-    "127.0.0.1"
+    "127.0.0.1", "0.0.0.0"
 ]
 
 # Application definition

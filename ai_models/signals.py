@@ -1,13 +1,24 @@
-from datetime import timezone
-
-from django.dispatch import receiver
+from django.utils import timezone
 from django.db.models.signals import post_migrate
-from .models import Transaction
+from django.dispatch import receiver
 
-@receiver(post_migrate, sender="ai_models")  # Only trigger for this app
+from ai_models.apps import AiModelsConfig
+
+
 def my_post_migrate_handler(sender, **kwargs):
-    # Use valid fields from your Transaction model
+    # Use relative import
+    from .models import Transaction
+
+    # Create sample transaction if none exists
     Transaction.objects.get_or_create(
         transaction_id=1,
-        defaults={"uploaded_at": timezone.now()}
+        defaults={
+            'uploaded_at': timezone.now(),
+            # Add other required fields for your model
+            # Example: 'amount': 0.0, 'description': 'Initial transaction'
+        }
     )
+
+
+# Connect the signal using the app config class name
+post_migrate.connect(my_post_migrate_handler, sender=AiModelsConfig)
