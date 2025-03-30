@@ -161,3 +161,7 @@ PLOTLY_COMPONENTS = [
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes timeout for tasks

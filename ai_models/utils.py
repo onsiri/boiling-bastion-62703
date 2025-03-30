@@ -256,6 +256,11 @@ def predict_future_sales(request):
             print(f"Critical error: {str(e)}")
         raise
 
+    finally:
+        from keras import backend as K
+        K.clear_session()  # Critical for TensorFlow
+        gc.collect()
+
 
 
 def get_customer_transaction_data():
@@ -295,10 +300,10 @@ def get_customer_history(user_id):
     """Get a customer's transaction history"""
     return Transaction.objects.filter(user__UserId=user_id).order_by('-TransactionTime')
 
-@receiver(post_save, sender=Transaction)
-def handle_new_transaction(sender, instance, **kwargs):
-    """Handle new transaction signal"""
-    generate_forecast()
+#@receiver(post_save, sender=Transaction)
+#def handle_new_transaction(sender, instance, **kwargs):
+#    """Handle new transaction signal"""
+ #   generate_forecast()
 
 
 def import_forecasts_from_s3():
