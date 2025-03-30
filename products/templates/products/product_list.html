@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock title %}
+
+{% block content %}
+
+    <div class="product-grid">
+    {% for product in products %}
+        <div class="product-card" data-product-name="{{ product.product_name }}">
+            <h2>{{ product.product_name }}</h2>
+            <p>{{ product.product_description }}</p>
+            <img class="product-image" src="{{ product.image.url }}" alt="{{ product.product_name }}" >
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var productCards = document.querySelectorAll('.product-card');
+
+        productCards.forEach(function(card) {
+            card.addEventListener('click', function() {
+                var productName = this.getAttribute('data-product-name').trim();
+                console.log('Clicked product:', productName);
+                // Normalize the comparison
+                if (productName.toLowerCase() === ('sale forecast').toLowerCase()){
+                    window.location.href = '/models/top-30-sale-forecast/';
+                }
+                else if (productName.toLowerCase() === ('Personalized Predictions').toLowerCase()) {
+                    window.location.href = '/models/future_sale/';
+                }
+                else if (productName.toLowerCase() === ('cold start prediction').toLowerCase()) {
+                    window.location.href = '/models/customer-recommendations/';
+                }
+            }); // Fixed the syntax error here
+        });
+    });
+</script>
+{% endblock content %}
