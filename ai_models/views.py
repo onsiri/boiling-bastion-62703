@@ -10,16 +10,47 @@ from django.core.management import call_command
 from django.views.generic import ListView
 from django.db.models import F
 import csv
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import F
 
 
 
 def top_30_sale_forecast(request):
+
     # Default sorting values
     default_sort = 'uploaded_at'
     default_order = 'desc'
+
+    # Handle CSV export first
+    if request.GET.get('export') == 'csv':
+        # Create CSV response
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="sale_forecast_{timezone.now().date()}.csv"'
+
+        writer = csv.writer(response)
+
+        # Write headers
+        writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
+
+        # Get sorted data
+        sort_by = request.GET.get('sort_by', default_sort)
+        sort_order = request.GET.get('sort_order', default_order)
+        order_prefix = '-' if sort_order == 'desc' else ''
+
+        try:
+            queryset = sale_forecast.objects.all().order_by(f'{order_prefix}{sort_by}')
+            for item in queryset:
+                writer.writerow([
+                    item.ds,
+                    item.prediction,
+                    item.prediction_lower,
+                    item.prediction_upper,
+                    item.uploaded_at
+                ])
+            return response
+        except Exception as e:
+            return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
 
     # Get sort parameters from request
     sort_by = request.GET.get('sort_by', default_sort)

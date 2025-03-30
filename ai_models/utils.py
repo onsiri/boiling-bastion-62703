@@ -254,7 +254,7 @@ def predict_future_sales(request):
     except Exception as e:
         if request:  # Handle CLI vs web context
             print(f"Critical error: {str(e)}")
-        raise
+        raise ValueError("Critical error: {str(e)}")
 
     finally:
         from keras import backend as K
