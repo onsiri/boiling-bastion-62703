@@ -30,6 +30,8 @@ import boto3
 from django.conf import settings
 import gc
 import os
+from django.apps import apps
+from django.db import transaction
 
 def generate_presigned_url(file_name):
     s3 = boto3.client(
@@ -306,13 +308,14 @@ def get_customer_history(user_id):
  #   generate_forecast()
 
 
-def import_forecasts_from_s3():
-    # 1. Configure AWS credentials (preferably from environment variables)
-    print(' # 1. Configure AWS credentials (preferably from environment variables)')
+def import_forecasts_from_s3(filename):
+    """Downloads CSV from S3 and returns DataFrame"""
+    # 1. Configure AWS credentials
+    print('# 1. Configure AWS credentials')
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     S3_BUCKET = 'dsinsight-3904-0253-1082-us-east-1'
-    S3_KEY = 'country_forecasts.csv'
+    s3_path = filename  # Use parameter as local path
 
     # 2. Download from S3
     print('# 2. Download from S3')
@@ -321,50 +324,130 @@ def import_forecasts_from_s3():
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
     )
-    local_path = 'country_forecasts.csv'
 
-    #try:
-        #s3.download_file(S3_BUCKET, S3_KEY, local_path)
-    #except ClientError as e:
-        #print(e)
+    try:
+        s3.download_file(S3_BUCKET, filename, s3_path)
+    except ClientError as e:
+        print(f"S3 download error: {e}")
+        return None
 
-    # 3. Read CSV
-    print(' # 3. Read CSV')
-    df = pd.read_csv(local_path, parse_dates=['ds'])
+    # 3. Read CSV with cleanup
+    print('# 3. Read CSV with cleanup')
+    try:
+        df = pd.read_csv(s3_path, parse_dates=['ds'])
 
-    # Validate required columns
-    print('# Validate required columns')
-    required_columns = ['ds', 'country', 'prediction', 'prediction_lower', 'prediction_upper']
-    if not all(col in df.columns for col in required_columns):
-        raise ValueError("CSV missing required columns")
+        # Validate required columns
+        #required_columns = ['ds', 'country', 'prediction', 'prediction_lower', 'prediction_upper']
+        #if not all(col in df.columns for col in required_columns):
+        #    raise ValueError("CSV missing required columns")
+        #print('# 4. Read CSV with cleanup successfully')
+        return df
+    finally:
+        if os.path.exists(s3_path):
+            os.remove(s3_path)
 
-    # 4. Clear existing forecasts
+
+
+
+
+def upload_object_db(model_object_name, df):
+    """Uploads DataFrame to specified model with progress tracking"""
+    print('[1/4] Getting model class...')
+    try:
+        model_class = apps.get_model('ai_models', model_object_name)
+    except LookupError as e:
+        raise ValueError(f"Model error: {str(e)}")
+
+    print('[2/4] Clearing existing records...')
     with transaction.atomic():
-        sale_forecast.objects.all().delete()
+        deleted_count = model_class.objects.all().delete()[0]
+        print(f'✅ Deleted {deleted_count} existing records')
 
-    # 5. Bulk insert with batches
+    print('[3/4] Preparing batch inserts...')
     batch_size = 1000
+    total_records = len(df)
     forecasts = []
-    for _, row in df.iterrows():
-        forecasts.append(sale_forecast(
-            ds=row['ds'].date(),  # Convert pandas datetime to date
-            country=row['country'],
-            prediction=row['prediction'],
-            prediction_lower=row['prediction_lower'],
-            prediction_upper=row['prediction_upper'],
-            accuracy_score=0  # Set default or extract from CSV if available
-        ))
 
-        if len(forecasts) >= batch_size:
-            with transaction.atomic():
-                sale_forecast.objects.bulk_create(forecasts)
+    # Check if DataFrame is empty
+    if df.empty:
+        raise ValueError("No data to upload!")
+
+    # Only proceed if model is sale_forecast
+    if model_class.__name__ == 'sale_forecast':
+        for idx, row in enumerate(df.itertuples(), 1):
+            try:
+                # Convert ds to date (handle timezone if needed)
+                ds_date = pd.to_datetime(row.ds).date()
+                forecasts.append(model_class(
+                    ds=ds_date,
+                    prediction=float(row.yhat),
+                    prediction_lower=float(row.yhat_lower),
+                    prediction_upper=float(row.yhat_upper),
+                    accuracy_score=0.0  # Default value
+                ))
+            except Exception as e:
+                print(f"Error in row {idx}: {str(e)}")
+                raise
+
+            # Batch insertion
+            if len(forecasts) >= batch_size:
+                model_class.objects.bulk_create(forecasts)
                 forecasts = []
 
-    # Insert remaining records
-    if forecasts:
-        with transaction.atomic():
-            sale_forecast.objects.bulk_create(forecasts)
+        # Insert remaining records
+        if forecasts:
+            model_class.objects.bulk_create(forecasts)
 
-    # 6. Cleanup
-    if os.path.exists(local_path):
-        os.remove(local_path)
+        # Only proceed if model is CountrySaleForecast
+    if model_class.__name__ == 'CountrySaleForecast':
+        for idx, row in enumerate(df.itertuples(), 1):
+            try:
+                # Convert ds to date (handle timezone if needed)
+                ds_date = pd.to_datetime(row.ds).date()
+                forecasts.append(model_class(
+                        ds=ds_date,
+                        group=row.country,
+                        prediction=float(row.prediction),
+                        prediction_lower=float(row.prediction_lower),
+                        prediction_upper=float(row.prediction_upper)
+                    ))
+            except Exception as e:
+                print(f"Error in row {idx}: {str(e)}")
+                raise
+
+                # Batch insertion
+            if len(forecasts) >= batch_size:
+                model_class.objects.bulk_create(forecasts)
+                forecasts = []
+
+            # Insert remaining records
+        if forecasts:
+            model_class.objects.bulk_create(forecasts)
+
+    # Only proceed if model is ItemSaleForecast
+    if model_class.__name__ == 'ItemSaleForecast':
+        for idx, row in enumerate(df.itertuples(), 1):
+            try:
+                # Convert ds to date (handle timezone if needed)
+                ds_date = pd.to_datetime(row.ds).date()
+                forecasts.append(model_class(
+                    ds=ds_date,
+                    group=row.ItemDescription,
+                    prediction=float(row.prediction),
+                    prediction_lower=float(row.prediction_lower),
+                    prediction_upper=float(row.prediction_upper)
+                ))
+            except Exception as e:
+                print(f"Error in row {idx}: {str(e)}")
+                raise
+
+                # Batch insertion
+            if len(forecasts) >= batch_size:
+                model_class.objects.bulk_create(forecasts)
+                forecasts = []
+
+            # Insert remaining records
+        if forecasts:
+            model_class.objects.bulk_create(forecasts)
+
+    print(f'🎉 Total {total_records} records inserted successfully')

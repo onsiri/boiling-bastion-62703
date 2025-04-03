@@ -339,3 +339,71 @@ body {
 .bg-primary {
     background-color: #007bff!important;
 }
+
+.dropdown {
+    position: relative;
+    background: inherit; /* Add this to match sidebar background */
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    left: 0; /* Changed from 100% */
+    top: 100%; /* Changed from 0 */
+    min-width: 200px;
+    background: inherit; /* Changed from #fff to inherit parent's background */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    padding: 10px 0;
+    z-index: 1000;
+}
+
+/* Rest of your existing styles remain the same */
+.dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+.dropdown-item {
+    padding: 8px 20px;
+    color: #333;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.dropdown-item:hover {
+    background: #f8f9fa;
+    padding-left: 25px;
+}
+
+.arrow {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.dropdown:hover .arrow {
+    transform: rotate(90deg);
+}
+
+.summary-cards .card {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+.summary-cards .card-title {
+        color: #6c757d;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+}
+.summary-cards .list-group-item {
+        background: transparent;
+        padding-left: 0;
+        padding-right: 0;
+}
+.summary-cards .badge {
+        font-size: 0.8em;
+        width: 30px;
+}
+.display-4 {
+        font-size: 2.5rem;
+        font-weight: 300;
+}

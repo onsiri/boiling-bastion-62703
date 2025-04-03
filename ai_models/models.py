@@ -23,7 +23,6 @@ class Item(models.Model):
 
 class sale_forecast(models.Model):
     ds = models.DateField()
-    country = models.CharField(max_length=100)
     prediction = models.DecimalField(max_digits=10, decimal_places=2)
     prediction_lower = models.DecimalField(max_digits=10, decimal_places=2)
     prediction_upper = models.DecimalField(max_digits=10, decimal_places=2)
@@ -31,7 +30,7 @@ class sale_forecast(models.Model):
     accuracy_score = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.country} - {self.ds}"
+        return f"{self.ds}"
 
 
 class CustomerDetail(models.Model):
@@ -137,18 +136,18 @@ class NewCustomerRecommendation(models.Model):
         uploaded_at = models.DateTimeField(auto_now_add=True)
         processed = models.BooleanField(default=False)
 
-    class CountrySaleForecast(models.Model):
-        group = models.CharField(max_length=100)  # Country name
-        ds = models.DateField()
-        yhat = models.FloatField()
-        yhat_lower = models.FloatField()
-        yhat_upper = models.FloatField()
-        created_at = models.DateTimeField(auto_now_add=True)
+class CountrySaleForecast(models.Model):
+    group = models.CharField(max_length=100)  # Country name
+    ds = models.DateField()
+    prediction = models.FloatField()
+    prediction_lower = models.FloatField()
+    prediction_upper = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    class ItemSaleForecast(models.Model):
-        group = models.CharField(max_length=200)  # ItemDescription
-        ds = models.DateField()
-        yhat = models.FloatField()
-        yhat_lower = models.FloatField()
-        yhat_upper = models.FloatField()
-        created_at = models.DateTimeField(auto_now_add=True)
+class ItemSaleForecast(models.Model):
+    group = models.CharField(max_length=200)  # ItemDescription
+    ds = models.DateField()
+    prediction = models.FloatField()
+    prediction_lower = models.FloatField()
+    prediction_upper = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)

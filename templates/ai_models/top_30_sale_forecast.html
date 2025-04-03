@@ -55,9 +55,9 @@
                             {% for item in page_obj %}
                             <tr>
                                 <td>{{ item.ds }}</td>
-                                <td>\${{ item.prediction }}</td>
-                                <td>\${{ item.prediction_lower }}</td>
-                                <td>\${{ item.prediction_upper }}</td>
+                                <td>${{ item.prediction }}</td>
+                                <td>${{ item.prediction_lower }}</td>
+                                <td>${{ item.prediction_upper }}</td>
                                 <td>{{ item.uploaded_at }}</td>
                             </tr>
                             {% empty %}

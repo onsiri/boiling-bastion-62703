@@ -4,8 +4,8 @@ from django.db import transaction
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, path
 from django.shortcuts import redirect, render
-from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation
-from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3
+from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation, CountrySaleForecast, ItemSaleForecast
+from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3, upload_object_db
 import numpy as np
 
 class BulkActionMixin:
@@ -240,7 +240,12 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
             analytics_errors = []
             try:
                 print("start generate_forecast function")
-                import_forecasts_from_s3()
+                sale_forecasts_df = import_forecasts_from_s3('forecast_next_30.csv')
+                upload_object_db('sale_forecast', sale_forecasts_df)
+                country_forecasts_df = import_forecasts_from_s3('country_forecasts.csv')
+                upload_object_db('CountrySaleForecast', country_forecasts_df)
+                item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
+                upload_object_db('ItemSaleForecast', item_forecasts_df)
             except Exception as e:
                 analytics_errors.append(f"Forecast error: {str(e)}")
 
@@ -360,7 +365,7 @@ class CustomerDetailsAdmin(BulkActionMixin, admin.ModelAdmin):
 
 # Standard Admins
 class SaleForecastAdmin(admin.ModelAdmin):
-    list_display = ['ds', 'country', 'prediction', 'prediction_lower', 'prediction_upper', 'accuracy_score' ,'uploaded_at']
+    list_display = ['ds', 'prediction', 'prediction_lower', 'prediction_upper', 'accuracy_score' ,'uploaded_at']
 
 
 class NextItemPredictionAdmin(admin.ModelAdmin):
@@ -372,6 +377,13 @@ class NewCustomerRecommendationAdmin(admin.ModelAdmin):
     list_display = ['user', 'item_code', 'confidence_score', 'generation_date', 'expiry_date']
     raw_id_fields = ['user']
 
+class CountrySaleForecastAdmin(admin.ModelAdmin):
+
+    list_display = ['group', 'ds', 'prediction', 'prediction_lower', 'prediction_upper']
+
+class ItemSaleForecastAdmin(admin.ModelAdmin):
+
+    list_display = ['group', 'ds', 'prediction', 'prediction_lower', 'prediction_upper']
 
 # Registration
 admin.site.register(Transaction, TransactionAdmin)
@@ -380,3 +392,6 @@ admin.site.register(CustomerDetail, CustomerDetailsAdmin)
 admin.site.register(sale_forecast, SaleForecastAdmin)
 admin.site.register(NextItemPrediction, NextItemPredictionAdmin)
 admin.site.register(NewCustomerRecommendation, NewCustomerRecommendationAdmin)
+admin.site.register(CountrySaleForecast, CountrySaleForecastAdmin)
+admin.site.register(ItemSaleForecast, ItemSaleForecastAdmin)
+
