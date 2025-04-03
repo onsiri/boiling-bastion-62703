@@ -2,185 +2,260 @@
 
 {% block content %}
 <div class="container">
-    <h2>Dual Sales Forecast Dashboard</h2>
+    <h2>Sales Forecast Dashboard</h2>
     <div class="summary-cards mb-4">
-    <div class="row">
-        <!-- Growth Rate Card -->
-        <div class="col-md-6 mb-3 mb-md-0">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Overall Country Growth</h5>
-                    <div class="d-flex align-items-center">
-                        <div class="display-4 mr-3">
-                            {% if mom_growth_rate is not None %}
-                                <span class="{% if mom_growth_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                    {{ mom_growth_rate|floatformat:1 }}%
-                                </span>
-                            {% else %}
-                                <span class="text-muted">N/A</span>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <small class="text-muted">
-                                MoM Growth Rate<br>
+        <div class="row">
+            <!-- MoM Growth Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">MOM Overall Country Growth Rate</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
                                 {% if mom_growth_rate is not None %}
-                                    {% if mom_growth_rate >= 0 %}
-                                        <i class="fas fa-arrow-up text-success"></i> Increase
-                                    {% else %}
-                                        <i class="fas fa-arrow-down text-danger"></i> Decrease
-                                    {% endif %}
+                                    <span class="{% if mom_growth_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                        {{ mom_growth_rate|floatformat:1 }}%
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
                                 {% endif %}
-                            </small>
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    Month-over-Month<br>
+                                    {% if mom_growth_rate is not None %}
+                                        {% if mom_growth_rate >= 0 %}
+                                            <i class="fas fa-arrow-up text-success"></i> Increase
+                                        {% else %}
+                                            <i class="fas fa-arrow-down text-danger"></i> Decrease
+                                        {% endif %}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Selling Items Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Top Selling Items</h5>
+                        {% if top_items %}
+                            <div class="list-group">
+                                {% for item in top_items|slice:":5" %}
+                                <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <span class="badge badge-primary badge-pill mr-2">{{ forloop.counter }}</span>
+                                        {{ item.group|truncatechars:20 }}
+                                    </div>
+                                    <span class="text-success">
+                                        {{ item.total_sales|floatformat:0 }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-muted">No sales data available</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Insights Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Market Insights</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
+                                {% if executive_summary %}
+                                    <span class="text-primary">
+                                        {{ executive_summary.top_country_percentage|floatformat:0 }}%
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    {% if executive_summary %}
+                                        {{ executive_summary.top_country }} Dominance<br>
+                                        Top Product: {{ executive_summary.top_product|truncatechars:15 }}<br>
+                                        ({{ executive_summary.product_percentage|floatformat:1 }}% of total)
+                                    {% else %}
+                                        No data available
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contribution to Total Sales Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Contribution to Total Sales</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
+                                {% if top_country_contribution %}
+                                    <span class="text-info">
+                                        {{ top_country_contribution.percentage|floatformat:0 }}%
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    {% if top_country_contribution %}
+                                        {{ top_country_contribution.name }}<br>
+                                        Leading Contributor
+                                    {% else %}
+                                        No country data
+                                    {% endif %}
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Top Selling Items Card -->
+    <!-- Distribution Pie Charts -->
+    <div class="row mt-4">
         <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Top Selling Items</h5>
-                    {% if top_items %}
-                        <div class="list-group">
-                            {% for item in top_items %}
-                            <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
-                                <div>
-                                    <span class="badge badge-primary badge-pill mr-2">{{ forloop.counter }}</span>
-                                    {{ item.group }}
-                                </div>
-                                <span class="text-success">
-                                    {{ item.total_sales|floatformat:0 }}
-                                </span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-muted">No sales data available</div>
-                    {% endif %}
+            <div class="chart-container">
+                <h4>Country Sales Distribution</h4>
+                <div id="country-pie-plot">
+                    {{ country_pie_plot|safe }}
                 </div>
+                <small class="text-muted">* Countries with &lt;1% are grouped under 'Other'</small>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4>Item Sales Distribution</h4>
+                <div id="item-pie-plot">
+                    {{ item_pie_plot|safe }}
+                </div>
+                <small class="text-muted">* Items with &lt;5% are grouped under 'Other'</small>
             </div>
         </div>
     </div>
-</div>
-
-    <!-- Country Section -->
-    <form method="GET">
-        <div class="dashboard-section">
-            <h3>Country Forecast Controls</h3>
-            <div class="form-row">
-                <div class="form-group col-md-6">
-                    <select name="country_group" class="form-control">
-                        <option value="All">All Countries</option>
-                        {% for group in country_groups %}
-                            {% if group != "All" %}
-                            <option value="{{ group }}" {% if country_selected == group %}selected{% endif %}>
-                                {{ group }}
-                            </option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group col-md-6">
-                    <select name="country_chart_type" class="form-control">
-                        {% for ct in chart_types %}
-                        <option value="{{ ct }}" {% if country_chart_type == ct %}selected{% endif %}>
-                            {{ ct|title }} Chart
+    <!-- Country Forecast Section -->
+<!-- Country Forecast Section -->
+<form method="GET">
+    <div class="dashboard-section compact-section mb-3">
+        <h4 class="section-title small-title">Country Forecast</h4>
+        <div class="form-row">
+            <div class="form-group col-md-6 mb-2">
+                <select name="country_group" class="form-control form-control-sm">
+                    <option value="All">All Countries</option>
+                    {% for group in country_groups %}
+                        {% if group != "All" %}
+                        <option value="{{ group }}" {% if country_selected == group %}selected{% endif %}>
+                            {{ group }}
                         </option>
-                        {% endfor %}
-                    </select>
-                </div>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-6 mb-2">
+                <select name="country_chart_type" class="form-control form-control-sm">
+                    {% for ct in chart_types %}
+                    <option value="{{ ct }}" {% if country_chart_type == ct %}selected{% endif %}>
+                        {{ ct|title }} Chart
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
-        <!-- Preserve Item settings -->
         <input type="hidden" name="item_group" value="{{ item_selected }}">
         <input type="hidden" name="item_chart_type" value="{{ item_chart_type }}">
-        <button type="submit" class="btn btn-primary btn-sm mb-3">Update Country</button>
-    </form>
-
-    <!-- Country Chart -->
-    <div class="chart-container">
-        <h4>Country Sales Forecast</h4>
-        <div id="country-plot">
-            {{ country_plot|safe }}
-        </div>
+        <button type="submit" class="btn btn-primary btn-xs">Update Country</button>
     </div>
-
-    <!-- Item Section -->
-    <form method="GET">
-        <div class="dashboard-section">
-            <h3>Item Forecast Controls</h3>
-            <div class="form-row">
-                <div class="form-group col-md-6">
-                    <select name="item_group" class="form-control">
-                        <option value="All">All Items</option>
-                        {% for group in item_groups %}
-                            {% if group != "All" %}
-                            <option value="{{ group }}" {% if item_selected == group %}selected{% endif %}>
-                                {{ group }}
-                            </option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group col-md-6">
-                    <select name="item_chart_type" class="form-control">
-                        {% for ct in chart_types %}
-                        <option value="{{ ct }}" {% if item_chart_type == ct %}selected{% endif %}>
-                            {{ ct|title }} Chart
+</form>
+<!-- Country Chart -->
+    <div class="chart-container mb-4">
+        <h4>Country Sales Forecast</h4>
+        {% if country_plot %}
+            <div class="chart-wrapper" style="height: 400px">
+                {{ country_plot|safe }}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mt-3">No country forecast data available</div>
+        {% endif %}
+    </div>
+<!-- Item Forecast Section -->
+<form method="GET">
+    <div class="dashboard-section compact-section mb-3">
+        <h4 class="section-title small-title">Item Forecast</h4>
+        <div class="form-row">
+            <div class="form-group col-md-6 mb-2">
+                <select name="item_group" class="form-control form-control-sm">
+                    <option value="All">All Items</option>
+                    {% for group in item_groups %}
+                        {% if group != "All" %}
+                        <option value="{{ group }}" {% if item_selected == group %}selected{% endif %}>
+                            {{ group }}
                         </option>
-                        {% endfor %}
-                    </select>
-                </div>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-6 mb-2">
+                <select name="item_chart_type" class="form-control form-control-sm">
+                    {% for ct in chart_types %}
+                    <option value="{{ ct }}" {% if item_chart_type == ct %}selected{% endif %}>
+                        {{ ct|title }} Chart
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
-        <!-- Preserve Country settings -->
         <input type="hidden" name="country_group" value="{{ country_selected }}">
         <input type="hidden" name="country_chart_type" value="{{ country_chart_type }}">
-        <button type="submit" class="btn btn-primary btn-sm mb-3">Update Item</button>
-    </form>
-
-    <!-- Item Chart -->
-    <div class="chart-container">
+        <button type="submit" class="btn btn-primary btn-xs">Update Item</button>
+    </div>
+</form>
+    <div class="chart-container mb-4">
         <h4>Item Sales Forecast</h4>
-        <div id="item-plot">
-            {{ item_plot|safe }}
-        </div>
+        {% if item_plot %}
+            <div class="chart-wrapper" style="height: 400px">
+                {{ item_plot|safe }}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mt-3">No item forecast data available</div>
+        {% endif %}
     </div>
 
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
-        function initResize(containerId) {
-            const plotContainer = document.getElementById(containerId);
-            function handleResize() {
-                if (plotContainer && Plotly) {
-                    Plotly.Plots.resize(plotContainer);
-                }
-            }
-            window.addEventListener('resize', handleResize);
-            handleResize();
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            initResize('country-plot');
-            initResize('item-plot');
+    // Auto-resize charts on window resize
+    function initResize(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const observer = new ResizeObserver(() => {
+            Plotly.Plots.resize(container);
         });
+
+        observer.observe(container);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        ['country-plot', 'item-plot'].forEach(id => {
+            if(document.getElementById(id)) {
+                initResize(id);
+            }
+        });
+    });
     </script>
 </div>
-
-<style>
-    .dashboard-section {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 15px;
-    }
-    .chart-container {
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 15px;
-        background: white;
-        margin-bottom: 25px;
-    }
-</style>
 {% endblock %}
