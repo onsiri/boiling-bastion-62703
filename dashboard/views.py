@@ -139,7 +139,7 @@ def sales_forecast_view(request):
 
     top_items = ItemSaleForecast.objects.values('group').annotate(
         total_sales=Sum('prediction')
-    ).order_by('-total_sales')[:3]
+    ).order_by('-total_sales')[:1]
     context = {
         'country_plot': country_plot,
         'item_plot': item_plot,
