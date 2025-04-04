@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import dj_database_url
 from pathlib import Path
 import os
+import redis
+from urllib.parse import urlparse
 
 # Load environment variables first
 load_dotenv()
@@ -167,12 +169,30 @@ CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes timeout for tasks
 
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
+# Parse the Redis URL
+url = urlparse(REDIS_URL)
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/0",  # Using docker service name
+        "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "ssl_cert_reqs": None
+            },
+            "SSL": REDIS_URL.startswith('rediss'),
         }
     }
+}
+
+# For Django Q and other Redis connections
+REDIS_CONNECTION = {
+    'host': url.hostname,
+    'port': url.port,
+    'password': url.password,
+    'ssl': REDIS_URL.startswith('rediss'),
+    'ssl_cert_reqs': None
 }
