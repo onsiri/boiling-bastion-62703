@@ -1,11 +1,18 @@
 /* General styles */
+/* Add this at the top of your CSS */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
 body {
     margin: 0;
     padding: 0;
-    display: flex;
     min-height: 100vh;
     font-family: 'Arial', sans-serif;
     background-color: #f8f9fa;
+    display: flex;
 }
 
 /* Sidebar styles */
@@ -15,7 +22,11 @@ body {
     color: white;
     display: flex;
     flex-direction: column;
-    flex-shrink: 0;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    box-sizing: border-box;
 }
 
 .sidebar-header {
@@ -31,6 +42,7 @@ body {
     padding: 0;
     margin: 0;
     flex: 1;
+    overflow-y: auto;
 }
 
 .sidebar-menu li {
@@ -52,9 +64,10 @@ body {
 /* Main content area */
 .main-content {
     flex: 1;
+    margin-left: 250px; /* Match sidebar width */
     display: flex;
     flex-direction: column;
-    background-color: #f8f9fa;
+    min-height: 100vh;
 }
 
 /* Header styles */
@@ -442,4 +455,24 @@ body {
 }
 .mb-2 {
         margin-bottom: 0.5rem!important;
+}
+.loading-spinner {
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    border: 0.25em solid #f3f3f3;
+    border-top: 0.25em solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.chart-placeholder {
+    min-height: 400px;
+    background: #f8f9fa;
+    border-radius: 8px;
 }

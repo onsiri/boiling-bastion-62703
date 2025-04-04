@@ -60,5 +60,22 @@
     </div>
 
     <script src="{% static 'js/base.js' %}"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script>
+document.addEventListener('htmx:configRequest', function(evt) {
+    // Preserve existing parameters
+    const currentParams = new URLSearchParams(window.location.search);
+    const newParams = new URLSearchParams(evt.detail.parameters);
+
+    // Merge parameters
+    currentParams.forEach((value, key) => {
+        if (!newParams.has(key)) {
+            newParams.set(key, value);
+        }
+    });
+
+    evt.detail.parameters = Object.fromEntries(newParams);
+});
+</script>
 </body>
 </html>

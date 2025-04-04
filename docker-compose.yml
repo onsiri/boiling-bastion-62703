@@ -2,7 +2,6 @@ services:
   web:
     build: .
     command: gunicorn django_project.wsgi:application --bind 0.0.0.0:8000 --timeout 300 --workers 3 --preload
-
     volumes:
       - .:/code
       - ./dashboard:/app/dashboard
@@ -10,6 +9,10 @@ services:
       - 8000:8000
     depends_on:
       - db
+      - redis  # Add Redis dependency
+    environment:
+      - REDIS_URL=redis://redis:6379/0  # Add Redis connection environment variable
+
   db:
     image: postgres:latest
     volumes:
@@ -18,7 +21,15 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+
+  redis:  # Add Redis service
+    image: redis:alpine
     ports:
-      - "5432:5432"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
 volumes:
   postgres_data:
+  redis_data:  # Add Redis volume for persistence

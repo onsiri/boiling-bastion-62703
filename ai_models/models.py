@@ -137,6 +137,11 @@ class NewCustomerRecommendation(models.Model):
         processed = models.BooleanField(default=False)
 
 class CountrySaleForecast(models.Model):
+    class Meta:
+        indexes = [
+            models.Index(fields=['group', 'ds']),
+            models.Index(fields=['ds'])
+        ]
     group = models.CharField(max_length=100)  # Country name
     ds = models.DateField()
     prediction = models.FloatField()
@@ -145,6 +150,11 @@ class CountrySaleForecast(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class ItemSaleForecast(models.Model):
+    class Meta:
+        indexes = [
+            models.Index(fields=['group', 'ds']),
+            models.Index(fields=['ds'])
+        ]
     group = models.CharField(max_length=200)  # ItemDescription
     ds = models.DateField()
     prediction = models.FloatField()

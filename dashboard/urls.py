@@ -9,4 +9,8 @@ urlpatterns = [
     #path('debug-dash-apps/', views.debug_view),
     path('sales-forecast/', sales_forecast_view, name='sales_forecast'),
     path('sales/', sales_forecast_view, name='sales_chart'),
+    path('sales-forecast/partial/', views.sales_forecast_partial, name='sales_forecast_partial'),
+    # Add these if using chart partials
+    path('chart/country/', views.country_chart_partial, name='country_chart'),
+    path('chart/item/', views.item_chart_partial, name='item_chart'),
 ]

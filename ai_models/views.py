@@ -1,66 +1,66 @@
 from django.shortcuts import render
 from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation
 from django.db.models import F, OuterRef, Subquery, Max
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.core.exceptions import FieldError
 from urllib.parse import urlencode
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse, HttpResponse
 from django.core.management import call_command
-from django.views.generic import ListView
-from django.db.models import F
-import csv
 from django.http import HttpResponse
 import csv
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import F
-
 
 
 def top_30_sale_forecast(request):
+    # Calculate date range (tomorrow + 30 days)
+    today = timezone.now().date()
+    start_date = today + timedelta(days=1)
+    end_date = today + timedelta(days=30)
+
+    # Base query with date filter
+    base_query = sale_forecast.objects.filter(
+        ds__gte=start_date,
+        ds__lte=end_date
+    )
 
     # Default sorting values
-    default_sort = 'uploaded_at'
-    default_order = 'desc'
+    default_sort = 'ds'  # Forecast date
+    default_order = 'asc'  # Chronological order
 
-    # Handle CSV export first
+    # Handle CSV export
     if request.GET.get('export') == 'csv':
-        # Create CSV response
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="sale_forecast_{timezone.now().date()}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="next_30_days_forecast_{today}.csv"'
 
         writer = csv.writer(response)
-
-        # Write headers
         writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
 
-        # Get sorted data
         sort_by = request.GET.get('sort_by', default_sort)
         sort_order = request.GET.get('sort_order', default_order)
         order_prefix = '-' if sort_order == 'desc' else ''
 
         try:
-            queryset = sale_forecast.objects.all().order_by(f'{order_prefix}{sort_by}')
+            queryset = base_query.order_by(f'{order_prefix}{sort_by}')
             for item in queryset:
                 writer.writerow([
-                    item.ds,
-                    item.prediction,
-                    item.prediction_lower,
-                    item.prediction_upper,
+                    item.ds,  # Already a date object
+                    max(0, item.prediction),
+                    max(0, item.prediction_lower),
+                    max(0, item.prediction_upper),
                     item.uploaded_at
                 ])
             return response
         except Exception as e:
             return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
 
-    # Get sort parameters from request
+    # Get sort parameters
     sort_by = request.GET.get('sort_by', default_sort)
     sort_order = request.GET.get('sort_order', default_order)
 
     # Validate sort parameters
-    valid_sort_fields = {'ds', 'prediction', 'prediction_lower', 'prediction_upper', 'uploaded_at'}
+    valid_sort_fields = {'ds', 'prediction', 'uploaded_at'}
     if sort_by not in valid_sort_fields:
         sort_by = default_sort
         sort_order = default_order
@@ -70,15 +70,13 @@ def top_30_sale_forecast(request):
     order_by = f'{order_prefix}{sort_by}'
 
     try:
-        # Base query with sorting
-        base_query = sale_forecast.objects.all().order_by(order_by)
+        sorted_query = base_query.order_by(order_by)
     except FieldError:
-        # Fallback to default sorting if there's any field error
-        base_query = sale_forecast.objects.all().order_by(f'-{default_sort}')
+        sorted_query = base_query.order_by(default_sort)
 
     # Pagination setup
-    items_per_page = 20
-    paginator = Paginator(base_query, items_per_page)
+    items_per_page = 20  # One day per row
+    paginator = Paginator(sorted_query, items_per_page)
     page_number = request.GET.get('page')
 
     try:
@@ -92,11 +90,9 @@ def top_30_sale_forecast(request):
         'page_obj': page_obj,
         'sort_by': sort_by,
         'sort_order': sort_order,
-        'request': request
+        'request': request,
+        'date_range': f"{start_date} to {end_date}"
     }
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render(request, 'ai_models/top_30_sale_forecast.html', context)
 
     return render(request, 'ai_models/top_30_sale_forecast.html', context)
 

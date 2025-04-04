@@ -1,0 +1,108 @@
+ <!-- Distribution Pie Charts -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4>Country Sales Distribution</h4>
+                <div id="country-pie-plot">
+                    {{ country_pie_plot|safe }}
+                </div>
+                <small class="text-muted">* Countries with &lt;1% are grouped under 'Other'</small>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4>Item Sales Distribution</h4>
+                <div id="item-pie-plot">
+                    {{ item_pie_plot|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Country Forecast Section -->
+
+
+<form method="GET" hx-get="{% url 'sales_forecast' %}" hx-target="#main-content" hx-push-url="true">
+    <div class="dashboard-section compact-section mb-3">
+        <h4 class="section-title small-title">Sales Forecast Filters</h4>
+        <div class="row g-2">
+            <!-- Country Filter -->
+            <div class="col-md-3">
+                <select name="country_group" class="form-select">
+                    <option value="All" {% if country_selected == 'All' %}selected{% endif %}>All Countries</option>
+                    {% for group in country_groups %}
+                        {% if group != "All" %}
+                        <option value="{{ group }}" {% if country_selected == group %}selected{% endif %}>
+                            {{ group }}
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Country Chart Type -->
+            <div class="col-md-2">
+                <select name="country_chart_type" class="form-select">
+                    {% for ct in chart_types %}
+                    <option value="{{ ct }}" {% if country_chart_type == ct %}selected{% endif %}>
+                        {{ ct|title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Item Filter -->
+            <div class="col-md-3">
+                <select name="item_group" class="form-select">
+                    <option value="All" {% if item_selected == 'All' %}selected{% endif %}>All Items</option>
+                    {% for group in item_groups %}
+                        {% if group != "All" %}
+                        <option value="{{ group }}" {% if item_selected == group %}selected{% endif %}>
+                            {{ group }}
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Item Chart Type -->
+            <div class="col-md-2">
+                <select name="item_chart_type" class="form-select">
+                    {% for ct in chart_types %}
+                    <option value="{{ ct }}" {% if item_chart_type == ct %}selected{% endif %}>
+                        {{ ct|title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Update</button>
+            </div>
+        </div>
+    </div>
+</form>
+<!-- Country Chart -->
+    <div class="chart-container mb-4">
+        <h4>Country Sales Forecast</h4>
+        {% if country_plot %}
+            <div class="chart-wrapper" style="height: 400px">
+                {{ country_plot|safe }}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mt-3">No country forecast data available</div>
+        {% endif %}
+    </div>
+<!-- Item Forecast Section -->
+
+    <div class="chart-container mb-4">
+        <h4>Item Sales Forecast</h4>
+        {% if item_plot %}
+            <div class="chart-wrapper" style="height: 400px">
+                {{ item_plot|safe }}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mt-3">No item forecast data available</div>
+        {% endif %}
+    </div>

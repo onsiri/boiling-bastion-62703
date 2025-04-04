@@ -380,9 +380,9 @@ def upload_object_db(model_object_name, df):
                 ds_date = pd.to_datetime(row.ds).date()
                 forecasts.append(model_class(
                     ds=ds_date,
-                    prediction=float(row.yhat),
-                    prediction_lower=float(row.yhat_lower),
-                    prediction_upper=float(row.yhat_upper),
+                    prediction=float(row.prediction),
+                    prediction_lower=float(row.prediction_lower),
+                    prediction_upper=float(row.prediction_upper),
                     accuracy_score=0.0  # Default value
                 ))
             except Exception as e:

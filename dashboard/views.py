@@ -1,20 +1,25 @@
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.core import serializers
-
+from django.core.cache import cache
 from ai_models.models import CountrySaleForecast
 from django.http import JsonResponse
 from django.core import serializers
 import boto3
 from datetime import datetime
-
+import numpy as np
 from django_project import settings
 from django.shortcuts import render
 from plotly.offline import plot
 import plotly.graph_objects as pgo
 from ai_models.models import CountrySaleForecast, ItemSaleForecast
-from django.db.models import Sum
+from django.db.models import Sum, Max, Q, Subquery, OuterRef
 from django.db.models.functions import TruncMonth
+from django.template.loader import render_to_string
+from django.db.models.functions import Coalesce
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+import pandas as pd
 
 def export_to_s3(request):
     # Serialize data
@@ -60,67 +65,145 @@ def debug_view(request):
     return HttpResponse(f"Registered Dash Apps: {list(apps.values_list('slug', flat=True))}")
 
 
-def sales_forecast_view(request):
-    # Country Forecast Data
-    country_groups = CountrySaleForecast.objects.values_list('group', flat=True).distinct()
+def get_sales_forecast_context(request):
+
+    country_selected = request.GET.get('country_group', 'All')
+    item_selected = request.GET.get('item_group', 'All')
+
+    # Base querysets with optimized filtering
+    country_base = CountrySaleForecast.objects.filter(
+        Q(group=country_selected) if country_selected != 'All' else Q()
+    ).select_related('group').only('ds', 'prediction', 'group')
+
+    item_base = ItemSaleForecast.objects.filter(
+        Q(group=item_selected) if item_selected != 'All' else Q()
+    ).select_related('group').only('ds', 'prediction', 'group')
+
+    # Batch critical data using subqueries
+    country_data = country_base.order_by('ds')[:365].annotate(
+        total_prediction=Subquery(
+            country_base.filter(ds=OuterRef('ds'))
+            .values('ds')
+            .annotate(total=Sum('prediction'))
+            .values('total')
+        )
+    )
+
+    item_data = item_base.order_by('ds')[:365].annotate(
+        total_prediction=Subquery(
+            item_base.filter(ds=OuterRef('ds'))
+            .values('ds')
+            .annotate(total=Sum('prediction'))
+            .values('total')
+        )
+    )
+
+    # Cache groups
+    country_groups = cache.get('country_groups')
+    item_groups = cache.get('item_groups')
+    if not country_groups:
+        country_groups = CountrySaleForecast.objects.values_list('group', flat=True) \
+                             .distinct()[:100]  # Limit to top 100
+        cache.set('country_groups', country_groups, 3600)
+
     country_selected = request.GET.get('country_group', 'All')
     country_chart_type = request.GET.get('country_chart_type', 'line')
 
-    # Item Forecast Data
-    item_groups = ItemSaleForecast.objects.values_list('group', flat=True).distinct()
     item_selected = request.GET.get('item_group', 'All')
     item_chart_type = request.GET.get('item_chart_type', 'line')
 
+    if not item_groups:
+        item_groups = ItemSaleForecast.objects.values_list('group', flat=True) \
+                             .distinct()[:100]  # Limit to top 100
+        cache.set('item_groups', item_groups, 3600)  # 1 hour
+
     def create_figure(data, chart_type, title):
-        if not data.exists():
-            return ""
+        # Convert to DataFrame and process dates
+        df = pd.DataFrame.from_records(data.values('ds', 'prediction'))
+        df['ds'] = pd.to_datetime(df['ds'])
+        df = df.sort_values('ds')  # Ensure chronological order
+
+        # Track resampling state
+        resampled = False
+        week_labels = []
+
+        if len(df) > 100:
+            # Resample to weekly means and create labels
+            resampled_df = df.set_index('ds').resample('W').mean().dropna()
+            resampled_df = resampled_df.reset_index()
+
+            # Generate week labels
+            week_labels = [
+                f"Week{(row['ds'].day - 1) // 7 + 1} {row['ds'].strftime('%b %Y')}"
+                for _, row in resampled_df.iterrows()
+            ]
+
+            df = resampled_df
+            resampled = True
 
         fig = pgo.Figure()
-        dates = [item.ds.strftime('%Y-%m-%d') for item in data]  # Convert dates to strings
-        predictions = [float(item.prediction) for item in data]
 
-        if chart_type == 'line':
-            fig.add_trace(pgo.Scatter(
-                x=dates,
-                y=predictions,
-                mode='lines+markers',
-                name='Prediction',
-                line=dict(color='#1f77b4')
-            ))
-            # Add confidence interval if data exists
-            if hasattr(data[0], 'prediction_lower') and hasattr(data[0], 'prediction_upper'):
-                lowers = [float(item.prediction_lower) for item in data]
-                uppers = [float(item.prediction_upper) for item in data]
-                fig.add_trace(pgo.Scatter(
-                    x=dates + dates[::-1],
-                    y=uppers + lowers[::-1],
-                    fill='toself',
-                    fillcolor='rgba(0,100,80,0.2)',
-                    line=dict(color='rgba(255,255,255,0)'),
-                    name='Confidence Interval'
-                ))
-        elif chart_type == 'bar':
-            fig.add_trace(pgo.Bar(
-                x=dates,
-                y=predictions,
-                name='Prediction',
-                marker_color='#1f77b4'
-            ))
-        elif chart_type == 'scatter':
-            fig.add_trace(pgo.Scatter(
-                x=dates,
-                y=predictions,
-                mode='markers',
-                name='Prediction',
-                marker=dict(color='#1f77b4', size=8)
-            ))
+        # Common configuration
+        x_values = week_labels if resampled else df['ds']
+        x_type = 'category' if resampled else 'date'
 
         fig.update_layout(
             title=title,
             showlegend=False,
             margin=dict(l=40, r=40, t=40, b=40),
-            plot_bgcolor='rgba(240,240,240,0.8)'
+            plot_bgcolor='rgba(240,240,240,0.8)',
+            xaxis=dict(
+                type=x_type,
+                tickangle=45,
+                title=None,
+                tickmode='array' if resampled else 'auto',
+                tickvals=list(range(len(week_labels))) if resampled else None,
+                ticktext=week_labels if resampled else None
+            ),
+            yaxis=dict(title='Sales Prediction'),
+            uirevision='static'
         )
+
+        # Handle different chart types
+        if chart_type == 'line':
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='lines+markers',
+                line=dict(width=2, shape='spline' if not resampled else 'linear'),
+                marker=dict(size=8, color='#4C78A8'),
+                hoverinfo='x+y'
+            ))
+        elif chart_type == 'bar':
+            fig.add_trace(pgo.Bar(
+                x=x_values,
+                y=df['prediction'],
+                marker_color='#4C78A8',
+                width=[0.8] * len(df) if resampled else None,
+                hoverinfo='x+y'
+            ))
+        elif chart_type == 'scatter':
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='markers',
+                marker=dict(
+                    size=12,
+                    color='#4C78A8',
+                    line=dict(width=1, color='DarkSlateGrey')
+                ),
+                hoverinfo='x+y'
+            ))
+
+        # Add range slider for date-based views
+        if not resampled:
+            fig.update_layout(
+                xaxis=dict(
+                    rangeslider=dict(visible=True),
+                    type='date'
+                )
+            )
+
         return plot(fig, output_type='div')
 
     # Country Chart
@@ -229,7 +312,7 @@ def sales_forecast_view(request):
     # Item Distribution Pie Chart (Top 20 Items)
     item_distribution = ItemSaleForecast.objects.values('group').annotate(
         total_prediction=Sum('prediction')
-    ).order_by('-total_prediction')[:20]  # Get top 20 items
+    ).order_by('-total_prediction')[:100]  # Get top 20 items
 
     # Process item distribution
     if item_distribution:
@@ -282,7 +365,7 @@ def sales_forecast_view(request):
         ))
 
     item_pie_fig.update_layout(
-        title='Item Sales Distribution<br><sub>Top 20 Items, others grouped</sub>',
+        title='Item Sales Distribution<br><sub>Top 100 Items, others grouped</sub>',
         height=500,
         showlegend=False
     )
@@ -351,4 +434,78 @@ def sales_forecast_view(request):
         'executive_summary': executive_summary,
         'top_country_contribution' : top_country_contribution,
     })
+    return context
+@cache_page(60 * 15)
+def sales_forecast_view(request):
+    context = get_sales_forecast_context(request)
     return render(request, 'dashboard/sales_forecast.html', context)
+# Cache partials for 5 minutes
+@cache_page(60 * 5)
+def sales_forecast_partial(request):
+    context = get_sales_forecast_context(request)
+    return render(request, 'dashboard/partials/main_content.html', context)
+
+def country_chart_partial(request):
+    # Extract the necessary context generation for country chart
+    context = get_sales_forecast_context(request)
+    return JsonResponse({
+        'chart': context['country_plot']
+    })
+
+def item_chart_partial(request):
+    # Extract the necessary context generation for item chart
+    context = get_sales_forecast_context(request)
+    return JsonResponse({
+        'chart': context['item_plot']
+    })
+
+
+def generate_chart_data(chart_type, filters):
+    """Generate data for async chart requests"""
+    if chart_type == "country":
+        queryset = CountrySaleForecast.objects.all()
+        if filters['country_group'] != 'All':
+            queryset = queryset.filter(group=filters['country_group'])
+
+    elif chart_type == "item":
+        queryset = ItemSaleForecast.objects.all()
+        if filters['item_group'] != 'All':
+            queryset = queryset.filter(group=filters['item_group'])
+    else:
+        raise ValueError("Invalid chart type")
+
+    # Optimize queryset
+    queryset = queryset.order_by('ds').only('ds', 'prediction')[:365]
+
+    # Convert to DataFrame for processing
+    df = pd.DataFrame.from_records(queryset.values('ds', 'prediction'))
+
+    if not df.empty:
+        df['ds'] = pd.to_datetime(df['ds'])
+        df.set_index('ds', inplace=True)
+
+        # Resample to weekly if too many points
+        if len(df) > 100:
+            df = df.resample('W').sum()
+
+        return {
+            'dates': df.index.strftime('%Y-%m-%d').tolist(),
+            'predictions': df['prediction'].round(2).tolist()
+        }
+    return {'dates': [], 'predictions': []}
+
+def async_chart_data(request):
+    chart_type = request.GET.get('type')
+    filters = {
+        'country_group': request.GET.get('country_group', 'All'),
+        'item_group': request.GET.get('item_group', 'All')
+    }
+
+    cache_key = f"chart_{chart_type}_{filters}"
+    data = cache.get(cache_key)
+
+    if not data:
+        data = generate_chart_data(chart_type, filters)
+        cache.set(cache_key, data, 300)  # Cache for 5 minutes
+
+    return JsonResponse(data)
