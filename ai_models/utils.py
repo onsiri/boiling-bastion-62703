@@ -2,6 +2,7 @@ import pandas as pd
 from botocore.exceptions import ClientError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.http import HttpResponse
 from keras import Sequential
 from keras.src.layers import Embedding, LSTM
 from keras.src.utils import pad_sequences
@@ -31,6 +32,7 @@ from django.db import transaction
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense
+from .tasks import async_predict_future_sales
 
 def generate_presigned_url(file_name):
     s3 = boto3.client(
@@ -153,7 +155,7 @@ def generate_forecast():
 
 
 def predict_future_sales(request):
-    try:
+    '''try:
         BATCH_SIZE = 1024
         SEQUENCE_LENGTH = 10
         EPOCHS = 5
@@ -270,8 +272,9 @@ def predict_future_sales(request):
         from keras import backend as K
         K.clear_session()  # Critical for TensorFlow
         gc.collect()
-        print('#7 predict_future_sales complete successfully')
-
+        print('#7 predict_future_sales complete successfully')'''
+    async_predict_future_sales.delay()  # Non-blocking
+    return HttpResponse("Training started in the background!")
 
 def get_customer_transaction_data():
     """

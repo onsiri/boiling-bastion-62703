@@ -277,6 +277,8 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
             }
             response = JsonResponse(response_data)
 
+
+
         except Exception as e:
             self.message_user(request, f"Processing failed: {str(e)}", level=messages.ERROR)
             response = JsonResponse({'error': str(e)}, status=400)

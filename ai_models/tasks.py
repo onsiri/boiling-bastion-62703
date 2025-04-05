@@ -1,7 +1,14 @@
 from celery import shared_task
-
-
-from ai_models.utils import generate_forecast, predict_future_sales
+from keras import Sequential
+from keras.src.layers import Embedding, LSTM
+from keras.src.utils import pad_sequences
+from sklearn.preprocessing import LabelEncoder
+from ai_models.models import Transaction, NextItemPrediction, Item
+import numpy as np
+from django.utils import timezone
+from django.db import transaction
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense
 from django.db import connection
 import pandas as pd
 @shared_task
@@ -10,7 +17,116 @@ def async_generate_forecast():
 
 @shared_task
 def async_predict_future_sales():
-    predict_future_sales(None)  # Pass None if no request object needed
+    try:
+        # Move your existing predict_future_sales logic here
+        # Ensure no request objects are used
+        BATCH_SIZE = 512
+        SEQUENCE_LENGTH = 5
+        EPOCHS = 2
+
+        # Data preparation
+        print('#1 ata preparation')
+        transactions = Transaction.objects.select_related('user').values(
+            'user_id', 'ItemCode'
+        ).order_by('user_id', 'TransactionTime')
+
+        if not transactions.exists():
+            return  # Add proper early return handling
+
+        items = Item.objects.all().values('ItemCode', 'ItemDescription', 'CostPerItem')
+        item_df = pd.DataFrame(items)
+        item_map = item_df.set_index('ItemCode').to_dict('index')
+
+        label_encoder = LabelEncoder()
+        label_encoder.fit(item_df['ItemCode'])
+
+        # Model setup (initialize once)
+        print('#2 Model setup (initialize once)')
+        model = Sequential([
+            Embedding(input_dim=len(label_encoder.classes_), output_dim=64),
+            LSTM(128, return_sequences=False),
+            Dense(len(label_encoder.classes_), activation='softmax')
+        ])
+        model.compile(
+            optimizer='adam',
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
+        )
+
+        # Prepare all sequences first
+        print('#3 Prepare all sequences first')
+        df = pd.DataFrame(transactions)
+        df['ItemCodeEncoded'] = label_encoder.transform(df['ItemCode'])
+        user_sequences = df.groupby('user_id')['ItemCodeEncoded'].apply(list).to_dict()
+
+        # Epoch training loop
+        print('#4 Epoch training loop')
+        print('#5 truncate first existing records')
+        with transaction.atomic():
+            deleted_count = NextItemPrediction.objects.all().delete()[0]
+            print(f'✅ Deleted NextItemPrediction: {deleted_count} existing records')
+        for epoch in range(EPOCHS):
+            predictions = []
+
+            for user_id, sequence in user_sequences.items():
+                # Sequence processing
+                if len(sequence) < SEQUENCE_LENGTH:
+                    continue
+
+                # Sliding window with randomization
+                windows = [
+                    sequence[i:i + SEQUENCE_LENGTH]
+                    for i in range(len(sequence) - SEQUENCE_LENGTH)
+                ]
+                np.random.shuffle(windows)
+
+                # Batch processing
+
+                for i in range(0, len(windows), BATCH_SIZE):
+                    batch = windows[i:i + BATCH_SIZE]
+                    X = pad_sequences([seq[:-1] for seq in batch], maxlen=SEQUENCE_LENGTH - 1)
+                    y = np.array([seq[-1] for seq in batch])
+
+                    # Train and predict
+                    model.train_on_batch(X, y)
+                    preds = model.predict(X, verbose=0)
+
+                    # Store predictions
+                    for seq, pred in zip(batch, preds):
+                        pred_idx = np.argmax(pred)
+                        prob = pred[pred_idx]
+                        item_code = label_encoder.inverse_transform([pred_idx])[0]
+
+                        predictions.append(NextItemPrediction(
+                            UserId=user_id,
+                            PredictedItemCode=item_code,
+                            PredictedItemDescription=item_map.get(item_code, {}).get('ItemDescription', ''),
+                            PredictedItemCost=item_map.get(item_code, {}).get('CostPerItem', 0),
+                            Probability=float(prob),
+                            PredictedAt=timezone.now()
+                        ))
+
+            # Periodic saving
+            print('#6 Periodic saving')
+            if predictions:
+                with transaction.atomic():
+                    NextItemPrediction.objects.bulk_create(
+                        predictions,
+                        batch_size=1000,
+                        update_conflicts=True,
+                        update_fields=[
+                            'PredictedItemCode',
+                            'PredictedItemDescription',
+                            'PredictedItemCost',
+                            'Probability',
+                            'PredictedAt'
+                        ],
+                        unique_fields=['UserId', 'PredictedAt']
+                    )
+                predictions = []
+        return "Task completed"
+    except Exception as e:
+        return f"Task failed: {str(e)}"
 
 @shared_task
 def process_analytics_after_upload():
