@@ -11,6 +11,10 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense
 from django.db import connection
 import pandas as pd
+from django.utils import timezone
+import logging
+logger = logging.getLogger(__name__)
+
 @shared_task
 def async_generate_forecast():
     generate_forecast()
@@ -20,6 +24,7 @@ def async_predict_future_sales():
     try:
         # Move your existing predict_future_sales logic here
         # Ensure no request objects are used
+        print(f"[{timezone.now()}] Task started")
         BATCH_SIZE = 512
         SEQUENCE_LENGTH = 5
         EPOCHS = 2
@@ -110,23 +115,13 @@ def async_predict_future_sales():
             print('#6 Periodic saving')
             if predictions:
                 with transaction.atomic():
-                    NextItemPrediction.objects.bulk_create(
-                        predictions,
-                        batch_size=1000,
-                        update_conflicts=True,
-                        update_fields=[
-                            'PredictedItemCode',
-                            'PredictedItemDescription',
-                            'PredictedItemCost',
-                            'Probability',
-                            'PredictedAt'
-                        ],
-                        unique_fields=['UserId', 'PredictedAt']
-                    )
+                    NextItemPrediction.objects.bulk_create(predictions, batch_size=1000)
                 predictions = []
-        return "Task completed"
+        print(f"[{timezone.now()}] Predictions saved: {len(predictions)} items")
+        return "SUCCESS"
     except Exception as e:
-        return f"Task failed: {str(e)}"
+        logger.error(f"Task failed: {e}")
+        raise
 
 @shared_task
 def process_analytics_after_upload():
