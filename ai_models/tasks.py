@@ -13,6 +13,9 @@ from django.db import connection
 import pandas as pd
 from django.utils import timezone
 import logging
+
+from ai_models.utils import generate_forecast
+
 logger = logging.getLogger(__name__)
 
 @shared_task
