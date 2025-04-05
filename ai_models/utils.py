@@ -273,7 +273,7 @@ def predict_future_sales(request):
         K.clear_session()  # Critical for TensorFlow
         gc.collect()
         print('#7 predict_future_sales complete successfully')'''
-    async_predict_future_sales.delay()  # Non-blocking
+    async_predict_future_sales()  # Non-blocking
     return HttpResponse("Training started in the background!")
 
 def get_customer_transaction_data():
