@@ -17,11 +17,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from ai_models.models import Transaction, NextItemPrediction, Item, CustomerDetail
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding, LSTM, Dense
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
