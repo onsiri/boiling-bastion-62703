@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation, CountrySaleForecast, ItemSaleForecast
 from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3, upload_object_db
 import numpy as np
-from .tasks import async_upload_object_db
+from .tasks import async_upload_object_db, async_predict_future_sales
 
 class BulkActionMixin:
     # Bulk delete configuration
@@ -245,6 +245,9 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 upload_object_db('sale_forecast', sale_forecasts_df)
                 country_forecasts_df = import_forecasts_from_s3('country_forecasts.csv')
                 upload_object_db('CountrySaleForecast', country_forecasts_df)
+                nextItem_forecasts_df = import_forecasts_from_s3('NextItemPrediction.csv')
+                nextItem_forecasts_df['PredictedAt'] = pd.to_datetime(nextItem_forecasts_df['PredictedAt'])
+                upload_object_db('NextItemPrediction', nextItem_forecasts_df)
                 item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
                 #upload_object_db('ItemSaleForecast', item_forecasts_df)
                 async_upload_object_db.delay(ItemSaleForecast, item_forecasts_df.to_json())
@@ -254,7 +257,8 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
 
             try:
                 print("start predict_future_sales function")
-                predict_future_sales(request)
+
+                #async_predict_future_sales.delay(request)
 
             except Exception as e:
                 analytics_errors.append(f"Sales prediction error: {str(e)}")

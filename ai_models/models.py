@@ -72,9 +72,6 @@ class Transaction(models.Model):
 
 class NextItemPrediction(models.Model):
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['UserId', 'PredictedAt'], name='unique_user_id_and_predicted_at'),
-        ]
         app_label = 'ai_models'
     UserId = models.CharField(max_length=100)
     PredictedItemCode = models.CharField(max_length=100)

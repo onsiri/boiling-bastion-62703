@@ -273,7 +273,7 @@ def predict_future_sales(request):
         K.clear_session()  # Critical for TensorFlow
         gc.collect()
         print('#7 predict_future_sales complete successfully')'''
-    async_predict_future_sales()  # Non-blocking
+    async_predict_future_sales.delay()  # Non-blocking
     return HttpResponse("Training started in the background!")
 
 def get_customer_transaction_data():
@@ -357,15 +357,12 @@ def import_forecasts_from_s3(filename):
         if os.path.exists(s3_path):
             os.remove(s3_path)
 
-
-
-
-
 def upload_object_db(model_object_name, df):
     """Uploads DataFrame to specified model with progress tracking"""
     print('[1/4] Getting model class...')
     try:
         model_class = apps.get_model('ai_models', model_object_name)
+        print(f"🛠️ Model class: {model_class.__name__}")
     except LookupError as e:
         raise ValueError(f"Model error: {str(e)}")
 
@@ -410,7 +407,7 @@ def upload_object_db(model_object_name, df):
             model_class.objects.bulk_create(forecasts)
 
         # Only proceed if model is CountrySaleForecast
-    if model_class.__name__ == 'CountrySaleForecast':
+    elif model_class.__name__ == 'CountrySaleForecast':
         for idx, row in enumerate(df.itertuples(), 1):
             try:
                 # Convert ds to date (handle timezone if needed)
@@ -436,7 +433,7 @@ def upload_object_db(model_object_name, df):
             model_class.objects.bulk_create(forecasts)
 
     # Only proceed if model is ItemSaleForecast
-    if model_class.__name__ == 'ItemSaleForecast':
+    elif model_class.__name__ == 'ItemSaleForecast':
         table_name = model_class._meta.db_table
         columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
 
@@ -463,5 +460,31 @@ def upload_object_db(model_object_name, df):
                    """
                 cursor.execute(query, batch)
                 print("Upload started in the background!")
+
+    #only process for NextItemPrediction
+    elif model_class.__name__ == 'NextItemPrediction':
+        print("✅ Processing NextItemPrediction")
+
+        # Convert PredictedAt to Django-aware datetime
+        from django.utils.timezone import make_aware
+        df['PredictedAt'] = df['PredictedAt'].apply(lambda x: make_aware(pd.to_datetime(x)))
+
+        forecasts = [
+            model_class(
+                UserId=row.UserId,
+                PredictedItemCode=row.PredictedItemCode,
+                PredictedItemDescription=row.PredictedItemDescription,
+                PredictedItemCost=float(row.PredictedItemCost),
+                Probability=float(row.Probability),
+                PredictedAt=row.PredictedAt  # Use converted datetime
+            )
+            for row in df.itertuples()
+        ]
+
+        # Bulk insert with conflict handling
+        model_class.objects.bulk_create(forecasts, batch_size=1000, ignore_conflicts=True)
+
+    else:
+        print(f'❌ Model {model_class.__name__} not recognized!')
 
     print(f'🎉 Total {total_records} records inserted successfully')
