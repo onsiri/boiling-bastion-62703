@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from keras import Sequential
 from keras.src.layers import Embedding, LSTM
-from keras.src.utils import to_categorical
+from keras.src.utils import pad_sequences
 from prophet import Prophet
 from django.utils import timezone
 from sklearn.neighbors import NearestNeighbors
@@ -17,7 +17,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from ai_models.models import Transaction, NextItemPrediction, Item, CustomerDetail
 import numpy as np
-
+from django.db import connection
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -28,6 +28,9 @@ import gc
 import os
 from django.apps import apps
 from django.db import transaction
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense
 
 def generate_presigned_url(file_name):
     s3 = boto3.client(
@@ -156,6 +159,7 @@ def predict_future_sales(request):
         EPOCHS = 5
 
         # Data preparation
+        print('#1 ata preparation')
         transactions = Transaction.objects.select_related('user').values(
             'user_id', 'ItemCode'
         ).order_by('user_id', 'TransactionTime')
@@ -171,6 +175,7 @@ def predict_future_sales(request):
         label_encoder.fit(item_df['ItemCode'])
 
         # Model setup (initialize once)
+        print('#2 Model setup (initialize once)')
         model = Sequential([
             Embedding(input_dim=len(label_encoder.classes_), output_dim=64),
             LSTM(128, return_sequences=False),
@@ -183,12 +188,17 @@ def predict_future_sales(request):
         )
 
         # Prepare all sequences first
-        all_sequences = []
+        print('#3 Prepare all sequences first')
         df = pd.DataFrame(transactions)
         df['ItemCodeEncoded'] = label_encoder.transform(df['ItemCode'])
         user_sequences = df.groupby('user_id')['ItemCodeEncoded'].apply(list).to_dict()
 
         # Epoch training loop
+        print('#4 Epoch training loop')
+        print('#5 truncate first existing records')
+        with transaction.atomic():
+            deleted_count = NextItemPrediction.objects.all().delete()[0]
+            print(f'✅ Deleted NextItemPrediction: {deleted_count} existing records')
         for epoch in range(EPOCHS):
             predictions = []
 
@@ -205,6 +215,7 @@ def predict_future_sales(request):
                 np.random.shuffle(windows)
 
                 # Batch processing
+
                 for i in range(0, len(windows), BATCH_SIZE):
                     batch = windows[i:i + BATCH_SIZE]
                     X = pad_sequences([seq[:-1] for seq in batch], maxlen=SEQUENCE_LENGTH - 1)
@@ -230,6 +241,7 @@ def predict_future_sales(request):
                         ))
 
             # Periodic saving
+            print('#6 Periodic saving')
             if predictions:
                 with transaction.atomic():
                     NextItemPrediction.objects.bulk_create(
@@ -258,7 +270,7 @@ def predict_future_sales(request):
         from keras import backend as K
         K.clear_session()  # Critical for TensorFlow
         gc.collect()
-
+        print('#7 predict_future_sales complete successfully')
 
 
 def get_customer_transaction_data():
@@ -422,28 +434,31 @@ def upload_object_db(model_object_name, df):
 
     # Only proceed if model is ItemSaleForecast
     if model_class.__name__ == 'ItemSaleForecast':
-        for idx, row in enumerate(df.itertuples(), 1):
-            try:
-                # Convert ds to date (handle timezone if needed)
-                ds_date = pd.to_datetime(row.ds).date()
-                forecasts.append(model_class(
-                    ds=ds_date,
-                    group=row.ItemDescription,
-                    prediction=float(row.prediction),
-                    prediction_lower=float(row.prediction_lower),
-                    prediction_upper=float(row.prediction_upper)
-                ))
-            except Exception as e:
-                print(f"Error in row {idx}: {str(e)}")
-                raise
+        table_name = model_class._meta.db_table
+        columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
 
-                # Batch insertion
-            if len(forecasts) >= batch_size:
-                model_class.objects.bulk_create(forecasts)
-                forecasts = []
+        # Prepare tuples for all rows
+        values = [
+            (
+                pd.to_datetime(row.ds).date().isoformat(),
+                row.country if model_class.__name__ == 'CountrySaleForecast' else row.ItemDescription,
+                float(row.prediction),
+                float(row.prediction_lower),
+                float(row.prediction_upper)
+            )
+            for row in df.itertuples()
+        ]
 
-            # Insert remaining records
-        if forecasts:
-            model_class.objects.bulk_create(forecasts)
+        # Batch insert using raw SQL
+        batch_size = 500  # Reduce batch size for Heroku
+        with connection.cursor() as cursor:
+            for i in range(0, len(values), batch_size):
+                batch = values[i:i + batch_size]
+                query = f"""INSERT INTO {table_name} 
+                       ({", ".join(columns)})
+                       VALUES {", ".join(["%s"] * len(batch))}
+                   """
+                cursor.execute(query, batch)
+                print("Upload started in the background!")
 
     print(f'🎉 Total {total_records} records inserted successfully')

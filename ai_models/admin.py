@@ -7,6 +7,7 @@ from django.shortcuts import redirect, render
 from .models import Transaction, sale_forecast, NextItemPrediction, Item, CustomerDetail, NewCustomerRecommendation, CountrySaleForecast, ItemSaleForecast
 from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3, upload_object_db
 import numpy as np
+from .tasks import async_upload_object_db
 
 class BulkActionMixin:
     # Bulk delete configuration
@@ -245,13 +246,16 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 country_forecasts_df = import_forecasts_from_s3('country_forecasts.csv')
                 upload_object_db('CountrySaleForecast', country_forecasts_df)
                 item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
-                upload_object_db('ItemSaleForecast', item_forecasts_df)
+                #upload_object_db('ItemSaleForecast', item_forecasts_df)
+                async_upload_object_db.delay(ItemSaleForecast, item_forecasts_df.to_json())
+                print("Upload started in the background!")
             except Exception as e:
                 analytics_errors.append(f"Forecast error: {str(e)}")
 
             try:
                 print("start predict_future_sales function")
                 predict_future_sales(request)
+
             except Exception as e:
                 analytics_errors.append(f"Sales prediction error: {str(e)}")
 
