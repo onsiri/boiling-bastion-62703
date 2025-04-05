@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <div id="recommendation-table" class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
@@ -15,8 +16,8 @@
                         <tr>
                             <td>{{ item.UserId }}</td>
                             <td>{{ item.PredictedItemDescription }}</td>
-                            <td>{{ item.Probability|floatformat:2 }}%</td>
-                            <td>\${{ item.PredictedItemCost }}</td>
+                            <td>{{ item.Probability|mul:100|floatformat:2 }}%</td>
+                            <td>${{ item.PredictedItemCost }}</td>
                         </tr>
                     {% empty %}
                         <tr>
