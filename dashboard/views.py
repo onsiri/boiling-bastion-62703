@@ -435,7 +435,7 @@ def get_sales_forecast_context(request):
         'top_country_contribution' : top_country_contribution,
     })
     return context
-@cache_page(60 * 15)
+@cache_page(60 * 15, cache="default")
 def sales_forecast_view(request):
     context = get_sales_forecast_context(request)
     return render(request, 'dashboard/sales_forecast.html', context)

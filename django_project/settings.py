@@ -177,13 +177,10 @@ url = urlparse(REDIS_URL)
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
+        "LOCATION": "redis://redis:6379/1",  # Use Docker service name if applicable
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "ssl_cert_reqs": None
-            },
-            "SSL": REDIS_URL.startswith('rediss'),
+            "IGNORE_EXCEPTIONS": True,  # Prevents crashes if Redis is down
         }
     }
 }

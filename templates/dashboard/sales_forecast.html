@@ -2,7 +2,10 @@
 
 {% block content %}
     <h2>Sales Forecast Dashboard For 2025</h2>
-
+    <script>
+        // Enable HTMX to execute scripts in responses
+        htmx.config.allowScripts = true;
+    </script>
     <!-- Main content container -->
     <div id="main-content">
         {% include "dashboard/partials/main_content.html" %}
@@ -10,6 +13,26 @@
 
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
+    function initCharts() {
+        // Target the actual chart container IDs (check your generated HTML)
+        ['country-plot', 'item-plot'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                // Re-initialize Plotly chart resizing
+                Plotly.Plots.resize(element);
+            }
+        });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initCharts);
+
+    // Reinitialize after HTMX content swap
+    document.addEventListener('htmx:afterSwap', initCharts);
+</script>
+    <script>
+
+
     // Auto-resize charts on window resize
     function initResize(containerId) {
         const container = document.getElementById(containerId);
