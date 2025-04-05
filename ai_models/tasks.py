@@ -14,13 +14,10 @@ import pandas as pd
 from django.utils import timezone
 import logging
 
-from ai_models.utils import generate_forecast
+
 
 logger = logging.getLogger(__name__)
 
-@shared_task
-def async_generate_forecast():
-    generate_forecast()
 
 @shared_task
 def async_predict_future_sales():
