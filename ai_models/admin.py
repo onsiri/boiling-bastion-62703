@@ -250,6 +250,7 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 analytics_errors.append(f"Forecast error: {str(e)}")
 
             try:
+                print("start predict_future_sales function")
                 predict_future_sales(request)
             except Exception as e:
                 analytics_errors.append(f"Sales prediction error: {str(e)}")
