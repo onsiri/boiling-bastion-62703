@@ -1,0 +1,98 @@
+<div class="summary-cards mb-4">
+        <div class="row">
+            <!-- Total Predicted Revenue Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Predicted Revenue</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
+                                    <span class="text-success">
+                                ${{ total_predicted_revenue|floatformat:0|default:"N/A" }}
+                            </span>
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    Expected value from predicted items<br>
+                                    <i class="fas fa-info-circle"
+                                   data-toggle="tooltip"
+                                   title="Sum of (Probability × Item Cost) for all predictions"></i>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Avg Confidence Score -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Avg. Prediction Confidence</h5>
+
+                            <div class="d-flex align-items-center">
+                        <div class="dis11play-4 mr-3">
+                            <span class="text-success">
+                                %{{ avg_confidence|floatformat:2|default:"N/A" }}
+                            </span>
+                        </div>
+                        <div>
+                            <small class="text-muted">AVG(Probability) across all predictions.<br>
+                                <i class="fas fa-info-circle"
+                                   data-toggle="tooltip"
+                                   title="Sum of (Probability × Item Cost) for all predictions"></i>
+                            </small>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ARPU Card -->
+            <div class="col-md-3 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Avg. Revenue Per User</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
+                                <span class="text-primary">
+                                    ${{ arpu|floatformat:2|default:"N/A" }}
+                                </span>
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    (Total Expected Revenue / Unique Users)<br>
+                                    <i class="fas fa-info-circle"
+                                       data-toggle="tooltip"
+                                       title="Average revenue expected per user based on predictions"></i>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diversity Card -->
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Recommendation Diversity</h5>
+                    <div class="d-flex align-items-center">
+                        <div class="display-4 mr-3">
+                            <span class="text-info">
+                                {{ unique_items_count|default:"N/A" }}
+                            </span>
+                        </div>
+                        <div>
+                            <small class="text-muted">
+                                Unique Items Recommended<br>
+                                <i class="fas fa-info-circle"
+                                   data-toggle="tooltip"
+                                   title="Number of distinct items recommended across all predictions"></i>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </div>
+</div>

@@ -246,6 +246,11 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 country_forecasts_df = import_forecasts_from_s3('country_forecasts.csv')
                 upload_object_db('CountrySaleForecast', country_forecasts_df)
                 nextItem_forecasts_df = import_forecasts_from_s3('NextItemPrediction.csv')
+                print(len((nextItem_forecasts_df)))
+            except Exception as e:
+                analytics_errors.append(f"Forecast error: {str(e)}")
+                print(analytics_errors)
+            try:
                 nextItem_forecasts_df['PredictedAt'] = pd.to_datetime(nextItem_forecasts_df['PredictedAt'])
                 upload_object_db('NextItemPrediction', nextItem_forecasts_df)
                 item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
@@ -254,7 +259,7 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 print("Upload started in the background!")
             except Exception as e:
                 analytics_errors.append(f"Forecast error: {str(e)}")
-
+                print(analytics_errors)
             try:
                 print("start predict_future_sales function")
 

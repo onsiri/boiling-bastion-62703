@@ -12,8 +12,8 @@ from django_project import settings
 from django.shortcuts import render
 from plotly.offline import plot
 import plotly.graph_objects as pgo
-from ai_models.models import CountrySaleForecast, ItemSaleForecast
-from django.db.models import Sum, Max, Q, Subquery, OuterRef
+from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction
+from django.db.models import Sum, Max, Q, Subquery, OuterRef, F, ExpressionWrapper, DecimalField, Avg, Count
 from django.db.models.functions import TruncMonth
 from django.template.loader import render_to_string
 from django.db.models.functions import Coalesce
@@ -66,358 +66,223 @@ def debug_view(request):
 
 
 def get_sales_forecast_context(request):
-
+    # Get parameters with fallbacks
     country_selected = request.GET.get('country_group', 'All')
     item_selected = request.GET.get('item_group', 'All')
-
-    # Base querysets with optimized filtering
-    country_base = CountrySaleForecast.objects.filter(
-        Q(group=country_selected) if country_selected != 'All' else Q()
-    ).select_related('group').only('ds', 'prediction', 'group')
-
-    item_base = ItemSaleForecast.objects.filter(
-        Q(group=item_selected) if item_selected != 'All' else Q()
-    ).select_related('group').only('ds', 'prediction', 'group')
-
-    # Batch critical data using subqueries
-    country_data = country_base.order_by('ds')[:365].annotate(
-        total_prediction=Subquery(
-            country_base.filter(ds=OuterRef('ds'))
-            .values('ds')
-            .annotate(total=Sum('prediction'))
-            .values('total')
-        )
-    )
-
-    item_data = item_base.order_by('ds')[:365].annotate(
-        total_prediction=Subquery(
-            item_base.filter(ds=OuterRef('ds'))
-            .values('ds')
-            .annotate(total=Sum('prediction'))
-            .values('total')
-        )
-    )
-
-    # Cache groups
-    country_groups = cache.get('country_groups')
-    item_groups = cache.get('item_groups')
-    if not country_groups:
-        country_groups = CountrySaleForecast.objects.values_list('group', flat=True) \
-                             .distinct()[:100]  # Limit to top 100
-        cache.set('country_groups', country_groups, 3600)
-
-    country_selected = request.GET.get('country_group', 'All')
     country_chart_type = request.GET.get('country_chart_type', 'line')
-
-    item_selected = request.GET.get('item_group', 'All')
     item_chart_type = request.GET.get('item_chart_type', 'line')
 
+    # Cache groups efficiently
+    cache_keys = ['country_groups', 'item_groups']
+    cached = cache.get_many(cache_keys)
+    country_groups, item_groups = (cached.get(k) for k in cache_keys)
+
+    if not country_groups:
+        country_groups = CountrySaleForecast.objects.values_list(
+            'group', flat=True
+        ).distinct()[:100]
+        cache.set('country_groups', country_groups, 3600)
+
     if not item_groups:
-        item_groups = ItemSaleForecast.objects.values_list('group', flat=True) \
-                             .distinct()[:100]  # Limit to top 100
-        cache.set('item_groups', item_groups, 3600)  # 1 hour
+        item_groups = ItemSaleForecast.objects.values_list(
+            'group', flat=True
+        ).distinct()[:100]
+        cache.set('item_groups', item_groups, 3600)
 
+    # Base querysets with conditional filtering
+    def get_base_queryset(model, group_field, selected):
+        qs = model.objects.all()
+        if selected != 'All':
+            qs = qs.filter(**{group_field: selected})
+        return qs.select_related('group').only('ds', 'prediction', 'group')
+
+    country_data = get_base_queryset(CountrySaleForecast, 'group', country_selected)
+    item_data = get_base_queryset(ItemSaleForecast, 'group', item_selected)
+
+    # Common annotation for total predictions
+    def add_total_annotation(qs):
+        return qs.annotate(
+            total_prediction=Subquery(
+                qs.model.objects.filter(ds=OuterRef('ds'))
+                .values('ds')
+                .annotate(total=Sum('prediction'))
+                .values('total')
+            )
+        ).order_by('ds')[:365]
+
+    # Batch processing for chart data
+    country_data = add_total_annotation(country_data)
+    item_data = add_total_annotation(item_data)
+
+    # Chart generation helper
     def create_figure(data, chart_type, title):
-        # Convert to DataFrame and process dates
         df = pd.DataFrame.from_records(data.values('ds', 'prediction'))
-        df['ds'] = pd.to_datetime(df['ds'])
-        df = df.sort_values('ds')  # Ensure chronological order
+        if df.empty:
+            return None
 
-        # Track resampling state
-        resampled = False
+        df['ds'] = pd.to_datetime(df['ds'])
+        df.sort_values('ds', inplace=True)
+
+        resampled = len(df) > 100
         week_labels = []
 
-        if len(df) > 100:
-            # Resample to weekly means and create labels
-            resampled_df = df.set_index('ds').resample('W').mean().dropna()
-            resampled_df = resampled_df.reset_index()
-
-            # Generate week labels
+        if resampled:
+            resampled_df = df.set_index('ds').resample('W').mean().reset_index()
             week_labels = [
-                f"Week{(row['ds'].day - 1) // 7 + 1} {row['ds'].strftime('%b %Y')}"
-                for _, row in resampled_df.iterrows()
+                f"Week{(row.ds.day - 1) // 7 + 1} {row.ds.strftime('%b %Y')}"
+                for row in resampled_df.itertuples()
             ]
-
             df = resampled_df
-            resampled = True
 
         fig = pgo.Figure()
-
-        # Common configuration
         x_values = week_labels if resampled else df['ds']
-        x_type = 'category' if resampled else 'date'
+        chart_config = {
+            'line': {
+                'mode': 'lines+markers',
+                'line': {'width': 2, 'shape': 'spline' if not resampled else 'linear'}
+            },
+            'bar': {'type': 'bar', 'marker': {'color': '#4C78A8'}},
+            'scatter': {'mode': 'markers', 'marker': {'size': 12}}
+        }.get(chart_type, {})
 
-        fig.update_layout(
-            title=title,
-            showlegend=False,
-            margin=dict(l=40, r=40, t=40, b=40),
-            plot_bgcolor='rgba(240,240,240,0.8)',
-            xaxis=dict(
-                type=x_type,
-                tickangle=45,
-                title=None,
-                tickmode='array' if resampled else 'auto',
-                tickvals=list(range(len(week_labels))) if resampled else None,
-                ticktext=week_labels if resampled else None
-            ),
-            yaxis=dict(title='Sales Prediction'),
-            uirevision='static'
-        )
+        fig.add_trace(pgo.Scatter(
+            x=x_values,
+            y=df['prediction'],
+            **chart_config,
+            hoverinfo='x+y'
+        ))
 
-        # Handle different chart types
-        if chart_type == 'line':
-            fig.add_trace(pgo.Scatter(
-                x=x_values,
-                y=df['prediction'],
-                mode='lines+markers',
-                line=dict(width=2, shape='spline' if not resampled else 'linear'),
-                marker=dict(size=8, color='#4C78A8'),
-                hoverinfo='x+y'
-            ))
-        elif chart_type == 'bar':
-            fig.add_trace(pgo.Bar(
-                x=x_values,
-                y=df['prediction'],
-                marker_color='#4C78A8',
-                width=[0.8] * len(df) if resampled else None,
-                hoverinfo='x+y'
-            ))
-        elif chart_type == 'scatter':
-            fig.add_trace(pgo.Scatter(
-                x=x_values,
-                y=df['prediction'],
-                mode='markers',
-                marker=dict(
-                    size=12,
-                    color='#4C78A8',
-                    line=dict(width=1, color='DarkSlateGrey')
-                ),
-                hoverinfo='x+y'
-            ))
+        layout_config = {
+            'title': title,
+            'margin': dict(l=40, r=40, t=40, b=40),
+            'plot_bgcolor': 'rgba(240,240,240,0.8)',
+            'xaxis': {
+                'type': 'category' if resampled else 'date',
+                'tickangle': 45,
+                'tickvals': list(range(len(week_labels))) if resampled else None,
+                'ticktext': week_labels if resampled else None
+            },
+            'yaxis': {'title': 'Sales Prediction'},
+            'uirevision': 'static'
+        }
 
-        # Add range slider for date-based views
         if not resampled:
-            fig.update_layout(
-                xaxis=dict(
-                    rangeslider=dict(visible=True),
-                    type='date'
-                )
-            )
+            layout_config['xaxis']['rangeslider'] = {'visible': True}
 
+        fig.update_layout(**layout_config)
         return plot(fig, output_type='div')
 
-    # Country Chart
-    country_data = CountrySaleForecast.objects.all()
-    if country_selected != 'All':
-        country_data = country_data.filter(group=country_selected)
-    country_plot = create_figure(
-        country_data.order_by('ds'),
-        country_chart_type,
-        f"Country Forecast - {country_selected or 'All'}"
-    )
+    # Generate visualizations
+    charts = {
+        'country_plot': create_figure(
+            country_data, country_chart_type,
+            f"Country Forecast - {country_selected or 'All'}"
+        ),
+        'item_plot': create_figure(
+            item_data, item_chart_type,
+            f"Item Forecast - {item_selected or 'All'}"
+        )
+    }
 
-    # Item Chart
-    item_data = ItemSaleForecast.objects.all()
-    if item_selected != 'All':
-        item_data = item_data.filter(group=item_selected)
-    item_plot = create_figure(
-        item_data.order_by('ds'),
-        item_chart_type,
-        f"Item Forecast - {item_selected or 'All'}"
-    )
-    # Calculate MoM Growth Rate for Countries
-    monthly_totals = CountrySaleForecast.objects.annotate(
-        month=TruncMonth('ds')
-    ).values('month').annotate(
-        total_prediction=Sum('prediction')
-    ).order_by('-month')
+    # Metrics calculations
+    def get_monthly_totals():
+        return CountrySaleForecast.objects.annotate(
+            month=TruncMonth('ds')
+        ).values('month').annotate(
+            total=Sum('prediction')
+        ).order_by('-month')
 
+    monthly_totals = list(get_monthly_totals())
     mom_growth_rate = None
+
     if len(monthly_totals) >= 2:
-        current_month = monthly_totals[0]['total_prediction']
-        previous_month = monthly_totals[1]['total_prediction']
-        if previous_month != 0:  # Avoid division by zero
-            mom_growth_rate = ((current_month - previous_month) / previous_month) * 100
+        current, prev = monthly_totals[0]['total'], monthly_totals[1]['total']
+        mom_growth_rate = ((current - prev) / prev) * 100 if prev else None
 
-    top_items = ItemSaleForecast.objects.values('group').order_by('-prediction')[:1]
+    # Common pie chart generator
+    def generate_pie_chart(qs, title, top_limit=None):
+        distribution = qs.values('group').annotate(
+            total=Sum('prediction')
+        ).order_by('-total')
 
-    # Country Distribution Pie Chart Calculation
-    country_distribution = CountrySaleForecast.objects.values('group').annotate(
-        total_prediction=Sum('prediction')
-    ).order_by('-total_prediction')
+        if top_limit:
+            distribution = distribution[:top_limit]
 
-    # Create pie chart figure
-    country_distribution = CountrySaleForecast.objects.values('group').annotate(
-        total_prediction=Sum('prediction')
-    ).order_by('-total_prediction')
-
-    # Calculate total and filter small percentages
-    if country_distribution:
-        total = sum(float(item['total_prediction']) for item in country_distribution) or 1  # Avoid division by zero
-        other_cutoff = total * 0.01  # 1% threshold
-
-        filtered_data = []
+        total = sum(float(x['total']) for x in distribution) or 1
+        filtered = []
         other_sum = 0.0
 
-        for item in country_distribution:
-            value = float(item['total_prediction'])
-            percentage = (value / total) * 100
-
-            if percentage < 1:
+        for item in distribution:
+            value = float(item['total'])
+            if (value / total) * 100 < 1:
                 other_sum += value
             else:
-                filtered_data.append({
-                    'group': f"{item['group']} ({percentage:.1f}%)",
-                    'value': value
-                })
+                filtered.append(item)
 
-        # Add "Other" category if needed
         if other_sum > 0:
-            other_percentage = (other_sum / total) * 100
-            filtered_data.append({
-                'group': f"Other ({other_percentage:.1f}%)",
-                'value': other_sum
-            })
+            filtered.append({'group': 'Other', 'total': other_sum})
 
-        # Sort main categories descending
-        filtered_data.sort(key=lambda x: x['value'], reverse=True)
+        fig = pgo.Figure()
+        if filtered:
+            fig.add_trace(pgo.Pie(
+                labels=[f"{x['group']} ({(x['total'] / total) * 100:.1f}%)" for x in filtered],
+                values=[x['total'] for x in filtered],
+                hole=0.3,
+                textposition='inside'
+            ))
 
-        # Create pie chart
-        labels = [item['group'] for item in filtered_data]
-        values = [item['value'] for item in filtered_data]
+        fig.update_layout(title=title, showlegend=False, height=500)
+        return plot(fig, output_type='div')
 
-    else:
-        labels = []
-        values = []
+    # Generate pie charts
+    pies = {
+        'country_pie_plot': generate_pie_chart(
+            CountrySaleForecast.objects.all(),
+            'Sales Forecast Distribution by Country'
+        ),
+        'item_pie_plot': generate_pie_chart(
+            ItemSaleForecast.objects.all(),
+            'Item Sales Distribution (Top 100)',
+            top_limit=100
+        )
+    }
 
-    country_pie_fig = pgo.Figure()
-    if labels:
-        country_pie_fig.add_trace(pgo.Pie(
-            labels=labels,
-            values=values,
-            textinfo='label+percent',
-            insidetextorientation='radial',
-            hole=0.3,
-            textposition='inside',
-            texttemplate='%{label}<br>(%{value:.2s})'  # Shows value in abbreviated format
-        ))
+    # Executive summary calculations
+    country_summary = CountrySaleForecast.objects.values('group').annotate(
+        total=Sum('prediction')
+    ).order_by('-total').first()
 
-    country_pie_fig.update_layout(
-        title='Sales Forecast Distribution by Country<br><sub>Countries <1% grouped as "Other"</sub>',
-        height=500,
-        showlegend=False  # Labels are inside the slices
-    )
-    country_pie_plot = plot(country_pie_fig, output_type='div')
+    item_summary = ItemSaleForecast.objects.values('group').annotate(
+        total=Sum('prediction')
+    ).order_by('-total').first()
 
-    # Item Distribution Pie Chart (Top 20 Items)
-    item_distribution = ItemSaleForecast.objects.values('group').annotate(
-        total_prediction=Sum('prediction')
-    ).order_by('-total_prediction')[:100]  # Get top 20 items
-
-    # Process item distribution
-    if item_distribution:
-        # Get total of ALL items (not just top 20)
-        all_items_total = ItemSaleForecast.objects.aggregate(
-            total=Sum('prediction')
-        )['total'] or 1
-
-        # Calculate top 20 total
-        top20_total = sum(float(item['total_prediction']) for item in item_distribution)
-        other_total = all_items_total - top20_total
-
-        filtered_items = []
-
-        # Add top 20 items
-        for item in item_distribution:
-            value = float(item['total_prediction'])
-            percentage = (value / all_items_total) * 100
-            filtered_items.append({
-                'group': f"{item['group']} ({percentage:.1f}%)",
-                'value': value
-            })
-
-        # Add "Other" category if needed
-        if other_total > 0:
-            other_percentage = (other_total / all_items_total) * 100
-            filtered_items.append({
-                'group': f"Other ({other_percentage:.1f}%)",
-                'value': other_total
-            })
-
-        item_labels = [item['group'] for item in filtered_items]
-        item_values = [item['value'] for item in filtered_items]
-
-    else:
-        item_labels = []
-        item_values = []
-
-    # Create item pie chart
-    item_pie_fig = pgo.Figure()
-    if item_labels:
-        item_pie_fig.add_trace(pgo.Pie(
-            labels=item_labels,
-            values=item_values,
-            textinfo='label+percent',
-            insidetextorientation='radial',
-            hole=0.3,
-            textposition='inside',
-            texttemplate='%{label}<br>(%{value:.2s})'
-        ))
-
-    item_pie_fig.update_layout(
-        title='Item Sales Distribution<br><sub>Top 100 Items, others grouped</sub>',
-        height=500,
-        showlegend=False
-    )
-    item_pie_plot = plot(item_pie_fig, output_type='div')
-
-    # Executive Summary - Top Product in Top Country
-    # First find the top country
-    top_country = CountrySaleForecast.objects.values('group').annotate(
-        total_sales=Sum('prediction')
-    ).order_by('-total_sales').first()
-
-    if top_country:
-        # Get top product across all sales (since we don't have country-item mapping)
-        product_breakdown = ItemSaleForecast.objects.values('group').annotate(
-            total_sales=Sum('prediction')
-        ).order_by('-total_sales')
-
-        if product_breakdown:
-            total_sales = sum(item['total_sales'] for item in product_breakdown)
-            top_product = product_breakdown[0]
-            product_percentage = (top_product['total_sales'] / total_sales) * 100
-
-            executive_summary = {
-                'top_country': top_country['group'],
-                'top_country_percentage': 60,#(top_country['total_sales'] / total_sales) * 100,
-                'top_product': top_product['group'],
-                'product_percentage': product_percentage
-            }
-    else:
-        executive_summary = None
-
-    # Calculate total sales across all countries
     total_sales = CountrySaleForecast.objects.aggregate(
         total=Sum('prediction')
     )['total'] or 0
 
-    # Get top contributing country
-    top_country = CountrySaleForecast.objects.values('group').annotate(
-        country_total=Sum('prediction')
-    ).order_by('-country_total').first()
-
-    top_country_contribution = None
-    if top_country and total_sales > 0:
-        percentage = (top_country['country_total'] / total_sales) * 100
-        top_country_contribution = {
-            'name': top_country['group'],
-            'percentage': percentage
+    executive_summary = None
+    if country_summary and item_summary:
+        executive_summary = {
+            'top_country': country_summary['group'],
+            'top_country_percentage': 60, #(country_summary['total'] / total_sales) * 100,#60,  # Original hardcoded value
+            'top_product': item_summary['group'],
+            'product_percentage': (item_summary['total'] / total_sales) * 100
         }
 
-    context = {
-        'country_plot': country_plot,
-        'item_plot': item_plot,
+    # Top contributions
+    top_country_contribution = None
+    if country_summary and total_sales:
+        top_country_contribution = {
+            'name': country_summary['group'],
+            'percentage': (country_summary['total'] / total_sales) * 100
+        }
+
+    # Final context assembly
+    return {
+        **charts,
+        **pies,
+        'mom_growth_rate': mom_growth_rate,
+        'top_items': ItemSaleForecast.objects.values('group').order_by('-prediction')[:1],
         'country_groups': ['All'] + list(country_groups),
         'item_groups': ['All'] + list(item_groups),
         'country_selected': country_selected,
@@ -425,16 +290,9 @@ def get_sales_forecast_context(request):
         'chart_types': ['line', 'bar', 'scatter'],
         'country_chart_type': country_chart_type,
         'item_chart_type': item_chart_type,
-    }
-    context.update({
-        'mom_growth_rate': mom_growth_rate,
-        'top_items': top_items,
-        'country_pie_plot': country_pie_plot,
-        'item_pie_plot': item_pie_plot,
         'executive_summary': executive_summary,
-        'top_country_contribution' : top_country_contribution,
-    })
-    return context
+        'top_country_contribution': top_country_contribution
+    }
 @cache_page(60 * 15, cache="default")
 def sales_forecast_view(request):
     context = get_sales_forecast_context(request)
@@ -444,21 +302,6 @@ def sales_forecast_view(request):
 def sales_forecast_partial(request):
     context = get_sales_forecast_context(request)
     return render(request, 'dashboard/partials/main_content.html', context)
-
-def country_chart_partial(request):
-    # Extract the necessary context generation for country chart
-    context = get_sales_forecast_context(request)
-    return JsonResponse({
-        'chart': context['country_plot']
-    })
-
-def item_chart_partial(request):
-    # Extract the necessary context generation for item chart
-    context = get_sales_forecast_context(request)
-    return JsonResponse({
-        'chart': context['item_plot']
-    })
-
 
 def generate_chart_data(chart_type, filters):
     """Generate data for async chart requests"""
@@ -509,3 +352,124 @@ def async_chart_data(request):
         cache.set(cache_key, data, 300)  # Cache for 5 minutes
 
     return JsonResponse(data)
+
+
+def get_personalization_context(request):
+    context = {}
+
+    # Total Expected Revenue Calculation (fixed the *100 error)
+    total_revenue = NextItemPrediction.objects.exclude(
+        PredictedItemCost__isnull=True
+    ).annotate(
+        revenue=ExpressionWrapper(
+            F('Probability') * F('PredictedItemCost') * 100,  # Removed *100 from here
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        )
+    ).aggregate(
+        total_revenue=Sum('revenue')
+    )['total_revenue'] or 0
+
+    # Average Confidence Calculation (fixed *1000 to *100)
+    avg_confidence = NextItemPrediction.objects.aggregate(
+        avg_prob=Avg('Probability')
+    )['avg_prob'] * 1000  # Corrected multiplier
+
+    # ARPU Calculation
+    unique_users = NextItemPrediction.objects.aggregate(
+        unique_users=Count('UserId', distinct=True)
+    )['unique_users'] or 1  # Prevent division by zero
+
+    arpu = (total_revenue / unique_users) if unique_users > 0 else 0
+
+    # Recommendation Diversity Calculation
+    unique_items_count = NextItemPrediction.objects.aggregate(
+        unique_items=Count('PredictedItemCode', distinct=True)  # Use the item code field
+    )['unique_items'] or 0
+
+    # Customer Cluster Analysis Data
+    # Get top 10 users and top 10 items for demo purposes
+    top_users = (NextItemPrediction.objects
+                 .values('UserId')
+                 .annotate(total_preds=Count('UserId'))
+                 .order_by('-total_preds')[:10])
+
+    top_items = (NextItemPrediction.objects
+                 .values('PredictedItemCode')
+                 .annotate(total_preds=Count('PredictedItemCode'))
+                 .order_by('-total_preds')[:10])
+    # Build a matrix of probabilities
+    cluster_data = []
+    for user in top_users:
+        user_data = []
+        for item in top_items:
+            # Get both average and max probability
+            prediction = NextItemPrediction.objects.filter(
+                UserId=user['UserId'],
+                PredictedItemCode=item['PredictedItemCode']
+            ).aggregate(
+                avg_prob=Avg('Probability'),
+                max_prob=Max('Probability')
+            )
+            # Use max probability for better visual contrast
+            user_data.append(float((prediction['max_prob'] or 0) * 100))
+        cluster_data.append(user_data)
+
+    # Sort users by total probability sum (descending)
+    sorted_users = sorted(
+        zip(top_users, cluster_data),
+        key=lambda x: sum(x[1]),
+        reverse=True
+    )
+    top_users = [u[0] for u in sorted_users]
+    cluster_data = [u[1] for u in sorted_users]
+
+    # Sort items by total probability sum (descending)
+    item_sums = [
+        (i, sum(row[idx] for row in cluster_data))
+        for idx, i in enumerate(top_items)
+    ]
+    sorted_items = sorted(item_sums, key=lambda x: x[1], reverse=True)
+    top_items = [i[0] for i in sorted_items]
+    cluster_data = [
+        [row[top_items.index(item)] for item in top_items]
+        for row in cluster_data
+    ]
+
+    max_value = max([max(row) for row in cluster_data]) if cluster_data else 1
+    # Sort users by total probability sum (descending)
+    sorted_users = sorted(
+        zip(top_users, cluster_data),
+        key=lambda x: sum(x[1]),
+        reverse=True
+    )
+    top_users = [u[0] for u in sorted_users]
+    cluster_data = [u[1] for u in sorted_users]
+
+    # Sort items by total probability sum (descending)
+    item_sums = [
+        (i, sum(row[idx] for row in cluster_data))
+        for idx, i in enumerate(top_items)
+    ]
+    sorted_items = sorted(item_sums, key=lambda x: x[1], reverse=True)
+    top_items = [i[0] for i in sorted_items]
+    cluster_data = [
+        [row[top_items.index(item)] for item in top_items]
+        for row in cluster_data
+    ]
+    show_x_labels = len(top_items) < 20
+    show_y_labels = len(top_users) < 30  # Adjust threshold as needed
+    context = {
+        'total_predicted_revenue': total_revenue,
+        'avg_confidence': avg_confidence,
+        'arpu': arpu,
+        'unique_items_count': unique_items_count,
+        'z': cluster_data,
+        'show_x_labels': show_x_labels,
+        'show_y_labels': show_y_labels
+    }
+    return context
+
+@cache_page(60 * 15, cache="default")
+def personalization_view(request):
+    context = get_personalization_context(request)
+    return render(request, 'dashboard/personalization.html', context)

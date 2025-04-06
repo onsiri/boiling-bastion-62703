@@ -345,14 +345,19 @@ def import_forecasts_from_s3(filename):
     # 3. Read CSV with cleanup
     print('# 3. Read CSV with cleanup')
     try:
-        df = pd.read_csv(s3_path, parse_dates=['ds'])
+        if filename == 'NextItemPrediction.csv':
+            df = pd.read_csv(s3_path)
+        else:
+            df = pd.read_csv(s3_path, parse_dates=['ds'])
 
         # Validate required columns
         #required_columns = ['ds', 'country', 'prediction', 'prediction_lower', 'prediction_upper']
         #if not all(col in df.columns for col in required_columns):
         #    raise ValueError("CSV missing required columns")
-        #print('# 4. Read CSV with cleanup successfully')
+        print('# 4. Read CSV with cleanup successfully')
         return df
+    except Exception as e:
+        print(e)
     finally:
         if os.path.exists(s3_path):
             os.remove(s3_path)

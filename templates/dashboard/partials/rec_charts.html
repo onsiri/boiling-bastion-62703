@@ -1,0 +1,57 @@
+<div class="col-md-12 mb-4">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title">Customer Preference Clusters</h5>
+            <div id="clusterHeatmap" style="height: 500px;"></div>
+            <small class="text-muted">
+                Heatmap showing user-item prediction probabilities (darker colors = higher probability)
+            </small>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const heatmapData = {
+        z: {{ cluster_heatmap.z|safe }},
+        x: {{ cluster_heatmap.x|safe }},
+        y: {{ cluster_heatmap.y|safe }},
+        type: 'heatmap',
+        colorscale: [[0, '#F0F0F0'], [0.2, '#FFEDA0'], [0.5, '#FEB24C'], [0.8, '#FC4E2A'], [1, '#B10026']],
+        zmin: {{ cluster_heatmap.zmin|default:0 }},
+        zmax: {{ cluster_heatmap.zmax|default:1 }},
+        hoverinfo: 'x+y+z',
+        showscale: true,
+        colorbar: {
+            title: 'Probability (%)',
+            titleside: 'right'
+        }
+    };
+
+    const layout = {
+        title: {
+            text: 'User-Item Prediction Probabilities',
+            font: { size: 16 }
+        },
+        xaxis: {
+    title: 'Items',
+    showticklabels: {{ show_x_labels|lower }},
+    tickangle: 45
+},
+yaxis: {
+    title: 'Users',
+    automargin: true,
+    showticklabels: {{ show_y_labels|lower }}
+},
+        margin: { t: 60, b: 150, l: 150, r: 40 },
+        height: 600
+    };
+
+    // Add click handler for potential future interactivity
+    document.getElementById('clusterHeatmap').on('plotly_click', function(data){
+        console.log('Clicked:', data.points[0]);
+    });
+
+    Plotly.newPlot('clusterHeatmap', [heatmapData], layout, {responsive: true});
+});
+</script>

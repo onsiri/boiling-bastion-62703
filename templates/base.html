@@ -18,11 +18,7 @@
                 <ul class="dropdown-menu">
                 <!-- Add static menu item -->
                 <li><a href="{% url 'sales_forecast' %}" class="dropdown-item">Sale Forecast</a></li>
-                <!-- Keep dynamic product list -->
-                {% for product in products %}
-                <li><a href="{% url 'product_detail' product.id %}" class="dropdown-item">{{ product.product_name }}</a>
-            </li>{% endfor %}</ul>
-            </li>
+                <li><a href="{% url 'personalization' %}" class="dropdown-item">Personalized Predictions</a></li>
             <li>FAQ</li>
             <li>Settings</li>
             <li><a href="{% url 'contact_us' %}">Contact Us</a></li>

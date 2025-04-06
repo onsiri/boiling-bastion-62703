@@ -299,3 +299,4 @@ def customer_recommendations(request):
         'page_obj': page_obj,  # Make sure this key is used
         'recommendations': page_obj.object_list,
     })
+
