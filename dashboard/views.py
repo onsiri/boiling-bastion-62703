@@ -381,8 +381,8 @@ def get_personalization_context(request):
     unique_users = NextItemPrediction.objects.aggregate(
         unique_users=Count('UserId', distinct=True)
     )['unique_users'] or 1
-    arpu = (total_revenue / unique_users).quantize(Decimal('0.00')) * 10 if unique_users else 0
 
+    arpu = (total_revenue / Decimal(unique_users)).quantize(Decimal('0.00')) * 10 if unique_users else 0
     # 4. Cluster Analysis with Validation
     top_users = list(NextItemPrediction.objects
                      .values_list('UserId', flat=True)
