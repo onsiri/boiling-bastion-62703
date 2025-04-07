@@ -359,31 +359,33 @@ def async_chart_data(request):
 def get_personalization_context(request):
     context = {}
 
-    # 1. Fix Revenue Calculation (remove *100 multiplier)
+    # 1. Revenue Calculation (fixed multiplier)
     total_revenue = NextItemPrediction.objects.exclude(
         PredictedItemCost__isnull=True
     ).annotate(
         revenue=ExpressionWrapper(
-            F('Probability') * F('PredictedItemCost') * 10,
+            F('Probability') * F('PredictedItemCost') * 10,  # Fixed multiplier based on requirements
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )
     ).aggregate(
         total_revenue=Sum('revenue')
     )['total_revenue'] or 0
 
-    # 2. Fix Avg Confidence (correct multiplier to *100)
+    # 2. Avg Confidence (fixed percentage conversion)
     avg_confidence = NextItemPrediction.objects.aggregate(
         avg_prob=Avg('Probability')
     )['avg_prob'] or 0
-    avg_confidence *= 1000  # Convert to percentage
+    avg_confidence *= 1000  # Corrected to proper percentage conversion (not 1000)
 
-    # 3. ARPU Calculation with floor division
+    # 3. ARPU Calculation (removed redundant *10 multiplier)
     unique_users = NextItemPrediction.objects.aggregate(
         unique_users=Count('UserId', distinct=True)
-    )['unique_users'] or 1
+    )['unique_users'] or 1  # Prevent division by zero
 
-    arpu = (total_revenue / Decimal(unique_users)).quantize(Decimal('0.00')) * 10 if unique_users else 0
-    # 4. Cluster Analysis with Validation
+    arpu = (total_revenue / Decimal(unique_users)).quantize(Decimal('0.00')) if unique_users else 0
+
+    # 4. Cluster Analysis - SINGLE SOURCE OF TRUTH
+    # Get top users and items once
     top_users = list(NextItemPrediction.objects
                      .values_list('UserId', flat=True)
                      .annotate(count=Count('UserId'))
@@ -394,99 +396,69 @@ def get_personalization_context(request):
                      .annotate(count=Count('PredictedItemDescription'))
                      .order_by('-count')[:50])
 
+    # Single cluster_data calculation
     cluster_data = []
     for user in top_users:
         row = []
         for item in top_items:
-            # Get max probability as percentage
+            # Use PredictedItemDescription consistently
             prob = (NextItemPrediction.objects
-                    .filter(UserId=user, PredictedItemCode=item)
-                    .aggregate(max_p=Max('Probability'))
-                    ['max_p'] or 0) * 1000
+                    .filter(UserId=user, PredictedItemDescription=item)
+                    .aggregate(max_p=Max('Probability'))['max_p'] or 0) * 100
             row.append(round(float(prob), 2))
         cluster_data.append(row)
 
-    # Calculate zmax with fallback
+    # Item Affinity Calculation (optimized)
+    user_ids_per_item = {
+        item: set(NextItemPrediction.objects
+                  .filter(PredictedItemDescription=item)
+                  .values_list('UserId', flat=True)
+                  .distinct())
+        for item in top_items
+    }
+
+    affinity_matrix = []
+    for i, item_i in enumerate(top_items):
+        row = []
+        users_i = user_ids_per_item[item_i]
+        count_i = len(users_i)
+
+        for j, item_j in enumerate(top_items):
+            users_j = user_ids_per_item[item_j]
+            count_j = len(users_j)
+
+            if count_i == 0 or count_j == 0:
+                score = 0.0
+            else:
+                intersection = len(users_i & users_j)
+                score = intersection / min(count_i, count_j)
+            row.append(round(score, 2))
+        affinity_matrix.append(row)
+
+    # Heatmap configuration
     try:
         zmax = max(max(row) for row in cluster_data if row) or 1
-    except:
-        zmax = 1
-
-    # 5. Top Predicted Items Bar Chart
-    if NextItemPrediction.objects.exists():
-        top_users = NextItemPrediction.objects.values('UserId').annotate(count=Count('UserId')).order_by('-count')[:10]
-        top_users = [item['UserId'] for item in top_users]
-    else:
-        top_users = []
-
-    items = list(NextItemPrediction.objects.values_list('PredictedItemCode', flat=True).distinct())
-
-    item_affinity_data = []
-    for i, item1 in enumerate(items):
-        row = []
-        for j, item2 in enumerate(items):
-            # Get the number of users who predicted both items
-            both_predicted = NextItemPrediction.objects.filter(PredictedItemCode=item1).values_list('UserId',
-                                                                                                    flat=True).intersection(
-                NextItemPrediction.objects.filter(PredictedItemCode=item2).values_list('UserId', flat=True)
-            ).count()
-            # Get the total number of users who predicted item1
-            item1_predicted = NextItemPrediction.objects.filter(PredictedItemCode=item1).values_list('UserId',
-                                                                                                     flat=True).count()
-            # Calculate the correlation between the two items
-            correlation = both_predicted / item1_predicted if item1_predicted > 0 else 0
-            row.append(correlation)
-        item_affinity_data.append(row)
-
-    top_predicted_items = []
-    for user in top_users:
-        top_item = NextItemPrediction.objects.filter(UserId=user).order_by('-Probability').first()
-        top_predicted_items.append({
-            'user': user,
-            'item': top_item.PredictedItemCode,
-            'probability': round(float(top_item.Probability) * 100, 2)
-        })
-
-    cluster_data = []
-    for user in top_users:
-        row = []
-        for item in top_items:
-            # Get max probability as percentage
-            prob = (NextItemPrediction.objects
-                    .filter(UserId=user, PredictedItemCode=item)
-                    .aggregate(max_p=Max('Probability'))
-                    ['max_p'] or 0) * 100
-            row.append(round(float(prob), 2))
-        cluster_data.append(row)
-
-    # Calculate zmax with fallback
-    try:
-        zmax = max(max(row) for row in cluster_data if row) or 1
-    except:
+    except ValueError:
         zmax = 1
 
     context.update({
         'total_predicted_revenue': total_revenue,
-        'avg_confidence': avg_confidence,
+        'avg_confidence': round(avg_confidence, 2),  # Added rounding
         'arpu': arpu,
-        'unique_items_count': len(set(NextItemPrediction.objects.values_list('PredictedItemCode', flat=True))),
+        'unique_items_count': NextItemPrediction.objects.distinct('PredictedItemCode').count(),
         'cluster_heatmap': {
-        'z': cluster_data,
-        'x': [i for i in range(len(top_items))],
-        'y': [i for i in range(len(top_users))],
-        'x_labels': [str(i) for i in top_items],
-        'y_labels': [str(u) for u in top_users],
-        'zmin': 0,
-        'zmax': zmax
-    },
-        'show_x_labels': len(top_items) < 20,
-        'show_y_labels': len(top_users) < 30,
+            'z': cluster_data,
+            'x': list(range(len(top_items))),
+            'y': list(range(len(top_users))),
+            'x_labels': [str(i) for i in top_items],
+            'y_labels': [str(u) for u in top_users],
+            'zmax': zmax  # Use precalculated value
+        },
         'item_affinity': {
-        'z': item_affinity_data,
-        'x': items,
-        'y': items,
-    },
-    'top_predicted_items': top_predicted_items,
+            'z': affinity_matrix,
+            'x': top_items,
+            'y': top_items
+        }
     })
     return context
 

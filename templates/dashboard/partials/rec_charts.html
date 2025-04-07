@@ -18,25 +18,6 @@
 {{ item_affinity.x|json_script:"itemAffinityX" }}
 {{ item_affinity.y|json_script:"itemAffinityY" }}
 
-<div class="col-md-12 mb-4">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title">Top Predicted Items</h5>
-            <div id="topPredictedItemsChart" style="height: 500px;"></div>
-            <div id="topPredictedItemsMessage" class="text-muted small mt-2"></div>
-        </div>
-    </div>
-</div>
-
-<div class="col-md-12 mb-4">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title">Item Affinity</h5>
-            <div id="itemAffinityChart" style="height: 500px;"></div>
-            <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
-        </div>
-    </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -94,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        messageDiv.textContent = `Displaying \${y.length} users and \${x.length} items`;
+        messageDiv.textContent = 'Displaying ' + y.length + ' users and ' + x.length + ' items';
 
     } catch (error) {
         heatmapDiv.style.display = 'none';
@@ -102,99 +83,75 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Heatmap error:', error);
     }
 
-    const topPredictedItemsDiv = document.getElementById('topPredictedItemsChart');
-    const topPredictedItemsMessageDiv = document.getElementById('topPredictedItemsMessage');
-    try {
-        const topPredictedItems = JSON.parse(document.getElementById('topPredictedItems').textContent);
+});
+</script>
 
-        // Validate data
-        if (!topPredictedItems.length) {
-            throw new Error('Missing top predicted items data');
-        }
+<!-- Add this after the existing cluster heatmap div -->
+<div class="col-md-12 mb-4">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title">Item Affinity</h5>
+            <div id="itemAffinityHeatmap" style="height: 500px;"></div>
+            <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
+        </div>
+    </div>
+</div>
 
-        const users = topPredictedItems.map(item => item.user);
-        const probabilities = topPredictedItems.map(item => item.probability);
-        const items = topPredictedItems.map(item => item.item);
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Existing cluster heatmap code here...
 
-        Plotly.newPlot(topPredictedItemsDiv, [{
-            x: users,
-            y: probabilities,
-            type: 'bar',
-            hoverinfo: 'text',
-            hovertext: items,
-            text: items
-        }], {
-            margin: {t: 30, b: 120, l: 120, r: 30},
-            xaxis: {
-                title: 'User',
-                tickangle: 45,
-                automargin: true
-            },
-            yaxis: {
-                title: 'Probability (%)',
-                automargin: true
-            }
-        });
-
-        topPredictedItemsMessageDiv.textContent = `Displaying top predicted items for \${users.length} users`;
-
-    } catch (error) {
-        topPredictedItemsDiv.style.display = 'none';
-        topPredictedItemsMessageDiv.textContent = `Error loading top predicted items: \${error.message}`;
-        console.error('Top predicted items error:', error);
-    }
-
-    const itemAffinityDiv = document.getElementById('itemAffinityChart');
+    // Item Affinity Heatmap
+    const itemAffinityHeatmapDiv = document.getElementById('itemAffinityHeatmap');
     const itemAffinityMessageDiv = document.getElementById('itemAffinityMessage');
     try {
-        const z = JSON.parse(document.getElementById('itemAffinityZ').textContent);
         const x = JSON.parse(document.getElementById('itemAffinityX').textContent);
         const y = JSON.parse(document.getElementById('itemAffinityY').textContent);
+        const z = JSON.parse(document.getElementById('itemAffinityZ').textContent);
 
-        // Validate data
-        if (!z.length || !x.length || !y.length) {
+        if (!x.length || !y.length || !z.length) {
             throw new Error('Missing item affinity data');
         }
 
-        // Force minimum color contrast
         const colorscale = [
             [0, '#F0F0F0'],
-            [0.01, '#FFEDA0'],  // Show faint color even for 1%
-            [0.1, '#FEB24C'],
-            [0.5, '#FC4E2A'],
-            [1, '#B10026']
+            [0.01, '#9ECAE1'],
+            [0.5, '#4292C6'],
+            [1, '#084594']
         ];
 
-        Plotly.newPlot(itemAffinityDiv, [{
-            z: z,
+        Plotly.newPlot(itemAffinityHeatmapDiv, [{
             x: x,
             y: y,
+            z: z,
             type: 'heatmap',
             colorscale: colorscale,
+            zmin: 0,
+            zmax: 1,
             hoverinfo: 'x+y+z',
             colorbar: {
-                title: 'Correlation',
-                tickformat: '.2f'
+                title: 'Affinity',
+                tickformat: '.0%'
             }
         }], {
             margin: {t: 30, b: 120, l: 120, r: 30},
             xaxis: {
-                title: 'Item',
+                title: 'Items',
                 tickangle: 45,
                 automargin: true
             },
             yaxis: {
-                title: 'Item',
+                title: 'Items',
                 automargin: true
             }
         });
 
-        itemAffinityMessageDiv.textContent = `Displaying item affinity for \${x.length} items`;
+        itemAffinityMessageDiv.textContent = 'Displaying affinity between' + x.length + 'items';
 
     } catch (error) {
-        itemAffinityDiv.style.display = 'none';
-        itemAffinityMessageDiv.textContent = `Error loading item affinity: \${error.message}`;
-        console.error('Item affinity error:', error);
+        itemAffinityHeatmapDiv.style.display = 'none';
+        itemAffinityMessageDiv.textContent = `Error loading affinity heatmap: \${error.message}`;
+        console.error('Affinity heatmap error:', error);
     }
 });
 </script>
