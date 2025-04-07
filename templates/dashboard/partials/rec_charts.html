@@ -13,6 +13,30 @@
 {{ cluster_heatmap.z|json_script:"heatmapZ" }}
 {{ cluster_heatmap.x_labels|json_script:"heatmapXLabels" }}
 {{ cluster_heatmap.y_labels|json_script:"heatmapYLabels" }}
+{{ top_predicted_items|json_script:"topPredictedItems" }}
+{{ item_affinity.z|json_script:"itemAffinityZ" }}
+{{ item_affinity.x|json_script:"itemAffinityX" }}
+{{ item_affinity.y|json_script:"itemAffinityY" }}
+
+<div class="col-md-12 mb-4">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title">Top Predicted Items</h5>
+            <div id="topPredictedItemsChart" style="height: 500px;"></div>
+            <div id="topPredictedItemsMessage" class="text-muted small mt-2"></div>
+        </div>
+    </div>
+</div>
+
+<div class="col-md-12 mb-4">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title">Item Affinity</h5>
+            <div id="itemAffinityChart" style="height: 500px;"></div>
+            <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
+        </div>
+    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -70,14 +94,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-
-        messageDiv.textContent = 'Displaying ' + y.length + ' users and ' + x.length + ' items';
+        messageDiv.textContent = `Displaying \${y.length} users and \${x.length} items`;
 
     } catch (error) {
         heatmapDiv.style.display = 'none';
         messageDiv.textContent = `Error loading heatmap: \${error.message}`;
         console.error('Heatmap error:', error);
     }
+
     const topPredictedItemsDiv = document.getElementById('topPredictedItemsChart');
     const topPredictedItemsMessageDiv = document.getElementById('topPredictedItemsMessage');
     try {
@@ -118,6 +142,59 @@ document.addEventListener('DOMContentLoaded', function() {
         topPredictedItemsDiv.style.display = 'none';
         topPredictedItemsMessageDiv.textContent = `Error loading top predicted items: \${error.message}`;
         console.error('Top predicted items error:', error);
+    }
+
+    const itemAffinityDiv = document.getElementById('itemAffinityChart');
+    const itemAffinityMessageDiv = document.getElementById('itemAffinityMessage');
+    try {
+        const z = JSON.parse(document.getElementById('itemAffinityZ').textContent);
+        const x = JSON.parse(document.getElementById('itemAffinityX').textContent);
+        const y = JSON.parse(document.getElementById('itemAffinityY').textContent);
+
+        // Validate data
+        if (!z.length || !x.length || !y.length) {
+            throw new Error('Missing item affinity data');
+        }
+
+        // Force minimum color contrast
+        const colorscale = [
+            [0, '#F0F0F0'],
+            [0.01, '#FFEDA0'],  // Show faint color even for 1%
+            [0.1, '#FEB24C'],
+            [0.5, '#FC4E2A'],
+            [1, '#B10026']
+        ];
+
+        Plotly.newPlot(itemAffinityDiv, [{
+            z: z,
+            x: x,
+            y: y,
+            type: 'heatmap',
+            colorscale: colorscale,
+            hoverinfo: 'x+y+z',
+            colorbar: {
+                title: 'Correlation',
+                tickformat: '.2f'
+            }
+        }], {
+            margin: {t: 30, b: 120, l: 120, r: 30},
+            xaxis: {
+                title: 'Item',
+                tickangle: 45,
+                automargin: true
+            },
+            yaxis: {
+                title: 'Item',
+                automargin: true
+            }
+        });
+
+        itemAffinityMessageDiv.textContent = `Displaying item affinity for \${x.length} items`;
+
+    } catch (error) {
+        itemAffinityDiv.style.display = 'none';
+        itemAffinityMessageDiv.textContent = `Error loading item affinity: \${error.message}`;
+        console.error('Item affinity error:', error);
     }
 });
 </script>
