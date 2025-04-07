@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.core import serializers
@@ -357,119 +359,78 @@ def async_chart_data(request):
 def get_personalization_context(request):
     context = {}
 
-    # Total Expected Revenue Calculation (fixed the *100 error)
+    # 1. Fix Revenue Calculation (remove *100 multiplier)
     total_revenue = NextItemPrediction.objects.exclude(
         PredictedItemCost__isnull=True
     ).annotate(
         revenue=ExpressionWrapper(
-            F('Probability') * F('PredictedItemCost') * 100,  # Removed *100 from here
+            F('Probability') * F('PredictedItemCost') * 10,
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )
     ).aggregate(
         total_revenue=Sum('revenue')
     )['total_revenue'] or 0
 
-    # Average Confidence Calculation (fixed *1000 to *100)
+    # 2. Fix Avg Confidence (correct multiplier to *100)
     avg_confidence = NextItemPrediction.objects.aggregate(
         avg_prob=Avg('Probability')
-    )['avg_prob'] * 1000  # Corrected multiplier
+    )['avg_prob'] or 0
+    avg_confidence *= 1000  # Convert to percentage
 
-    # ARPU Calculation
+    # 3. ARPU Calculation with floor division
     unique_users = NextItemPrediction.objects.aggregate(
         unique_users=Count('UserId', distinct=True)
-    )['unique_users'] or 1  # Prevent division by zero
+    )['unique_users'] or 1
+    arpu = (total_revenue / unique_users).quantize(Decimal('0.00')) * 10 if unique_users else 0
 
-    arpu = (total_revenue / unique_users) if unique_users > 0 else 0
+    # 4. Cluster Analysis with Validation
+    top_users = list(NextItemPrediction.objects
+                     .values_list('UserId', flat=True)
+                     .annotate(count=Count('UserId'))
+                     .order_by('-count')[:10])
 
-    # Recommendation Diversity Calculation
-    unique_items_count = NextItemPrediction.objects.aggregate(
-        unique_items=Count('PredictedItemCode', distinct=True)  # Use the item code field
-    )['unique_items'] or 0
+    top_items = list(NextItemPrediction.objects
+                     .values_list('PredictedItemCode', flat=True)
+                     .annotate(count=Count('PredictedItemCode'))
+                     .order_by('-count')[:10])
 
-    # Customer Cluster Analysis Data
-    # Get top 10 users and top 10 items for demo purposes
-    top_users = (NextItemPrediction.objects
-                 .values('UserId')
-                 .annotate(total_preds=Count('UserId'))
-                 .order_by('-total_preds')[:10])
-
-    top_items = (NextItemPrediction.objects
-                 .values('PredictedItemCode')
-                 .annotate(total_preds=Count('PredictedItemCode'))
-                 .order_by('-total_preds')[:10])
-    # Build a matrix of probabilities
     cluster_data = []
     for user in top_users:
-        user_data = []
+        row = []
         for item in top_items:
-            # Get both average and max probability
-            prediction = NextItemPrediction.objects.filter(
-                UserId=user['UserId'],
-                PredictedItemCode=item['PredictedItemCode']
-            ).aggregate(
-                avg_prob=Avg('Probability'),
-                max_prob=Max('Probability')
-            )
-            # Use max probability for better visual contrast
-            user_data.append(float((prediction['max_prob'] or 0) * 100))
-        cluster_data.append(user_data)
+            # Get max probability as percentage
+            prob = (NextItemPrediction.objects
+                    .filter(UserId=user, PredictedItemCode=item)
+                    .aggregate(max_p=Max('Probability'))
+                    ['max_p'] or 0) * 100
+            row.append(round(float(prob), 2))
+        cluster_data.append(row)
 
-    # Sort users by total probability sum (descending)
-    sorted_users = sorted(
-        zip(top_users, cluster_data),
-        key=lambda x: sum(x[1]),
-        reverse=True
-    )
-    top_users = [u[0] for u in sorted_users]
-    cluster_data = [u[1] for u in sorted_users]
+    # Calculate zmax with fallback
+    try:
+        zmax = max(max(row) for row in cluster_data if row) or 1
+    except:
+        zmax = 1
 
-    # Sort items by total probability sum (descending)
-    item_sums = [
-        (i, sum(row[idx] for row in cluster_data))
-        for idx, i in enumerate(top_items)
-    ]
-    sorted_items = sorted(item_sums, key=lambda x: x[1], reverse=True)
-    top_items = [i[0] for i in sorted_items]
-    cluster_data = [
-        [row[top_items.index(item)] for item in top_items]
-        for row in cluster_data
-    ]
-
-    max_value = max([max(row) for row in cluster_data]) if cluster_data else 1
-    # Sort users by total probability sum (descending)
-    sorted_users = sorted(
-        zip(top_users, cluster_data),
-        key=lambda x: sum(x[1]),
-        reverse=True
-    )
-    top_users = [u[0] for u in sorted_users]
-    cluster_data = [u[1] for u in sorted_users]
-
-    # Sort items by total probability sum (descending)
-    item_sums = [
-        (i, sum(row[idx] for row in cluster_data))
-        for idx, i in enumerate(top_items)
-    ]
-    sorted_items = sorted(item_sums, key=lambda x: x[1], reverse=True)
-    top_items = [i[0] for i in sorted_items]
-    cluster_data = [
-        [row[top_items.index(item)] for item in top_items]
-        for row in cluster_data
-    ]
-    show_x_labels = len(top_items) < 20
-    show_y_labels = len(top_users) < 30  # Adjust threshold as needed
-    context = {
+    context.update({
         'total_predicted_revenue': total_revenue,
         'avg_confidence': avg_confidence,
         'arpu': arpu,
-        'unique_items_count': unique_items_count,
-        'z': cluster_data,
-        'show_x_labels': show_x_labels,
-        'show_y_labels': show_y_labels
-    }
+        'unique_items_count': NextItemPrediction.objects.distinct('PredictedItemCode').count(),
+        'cluster_heatmap': {
+            'z': cluster_data,
+            'x': [str(i) for i in top_items],
+            'y': [str(u) for u in top_users],
+            'zmin': 0,
+            'zmax': zmax
+        },
+        'show_x_labels': len(top_items) < 20,
+        'show_y_labels': len(top_users) < 30
+    })
     return context
 
 @cache_page(60 * 15, cache="default")
 def personalization_view(request):
     context = get_personalization_context(request)
     return render(request, 'dashboard/personalization.html', context)
+

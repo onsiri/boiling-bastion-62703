@@ -3,55 +3,71 @@
         <div class="card-body">
             <h5 class="card-title">Customer Preference Clusters</h5>
             <div id="clusterHeatmap" style="height: 500px;"></div>
-            <small class="text-muted">
-                Heatmap showing user-item prediction probabilities (darker colors = higher probability)
-            </small>
+            <div id="heatmapMessage" class="text-muted small mt-2"></div>
         </div>
     </div>
 </div>
 
+{{ cluster_heatmap.x|json_script:"heatmapX" }}
+{{ cluster_heatmap.y|json_script:"heatmapY" }}
+{{ cluster_heatmap.z|json_script:"heatmapZ" }}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const heatmapData = {
-        z: {{ cluster_heatmap.z|safe }},
-        x: {{ cluster_heatmap.x|safe }},
-        y: {{ cluster_heatmap.y|safe }},
-        type: 'heatmap',
-        colorscale: [[0, '#F0F0F0'], [0.2, '#FFEDA0'], [0.5, '#FEB24C'], [0.8, '#FC4E2A'], [1, '#B10026']],
-        zmin: {{ cluster_heatmap.zmin|default:0 }},
-        zmax: {{ cluster_heatmap.zmax|default:1 }},
-        hoverinfo: 'x+y+z',
-        showscale: true,
-        colorbar: {
-            title: 'Probability (%)',
-            titleside: 'right'
+    const heatmapDiv = document.getElementById('clusterHeatmap');
+    const messageDiv = document.getElementById('heatmapMessage');
+    try {
+        const x = JSON.parse(document.getElementById('heatmapX').textContent);
+        const y = JSON.parse(document.getElementById('heatmapY').textContent);
+        const z = JSON.parse(document.getElementById('heatmapZ').textContent);
+        const zmax = {{ cluster_heatmap.zmax|default:100 }};
+
+        // Validate data
+        if (!x.length || !y.length || !z.length) {
+            throw new Error('Missing heatmap data');
         }
-    };
 
-    const layout = {
-        title: {
-            text: 'User-Item Prediction Probabilities',
-            font: { size: 16 }
-        },
-        xaxis: {
-    title: 'Items',
-    showticklabels: {{ show_x_labels|lower }},
-    tickangle: 45
-},
-yaxis: {
-    title: 'Users',
-    automargin: true,
-    showticklabels: {{ show_y_labels|lower }}
-},
-        margin: { t: 60, b: 150, l: 150, r: 40 },
-        height: 600
-    };
+        // Force minimum color contrast
+        const colorscale = [
+            [0, '#F0F0F0'],
+            [0.01, '#FFEDA0'],  // Show faint color even for 1%
+            [0.1, '#FEB24C'],
+            [0.5, '#FC4E2A'],
+            [1, '#B10026']
+        ];
 
-    // Add click handler for potential future interactivity
-    document.getElementById('clusterHeatmap').on('plotly_click', function(data){
-        console.log('Clicked:', data.points[0]);
-    });
+        Plotly.newPlot(heatmapDiv, [{
+            x: x,
+            y: y,
+            z: z,
+            type: 'heatmap',
+            colorscale: colorscale,
+            zmin: 0,
+            zmax: zmax,
+            hoverinfo: 'x+y+z',
+            colorbar: {
+                title: 'Probability (%)',
+                tickformat: '.1f%'
+            }
+        }], {
+            margin: {t: 30, b: 120, l: 120, r: 30},
+            xaxis: {
+                title: 'Items',
+                tickangle: 45,
+                automargin: true
+            },
+            yaxis: {
+                title: 'Users',
+                automargin: true
+            }
+        });
 
-    Plotly.newPlot('clusterHeatmap', [heatmapData], layout, {responsive: true});
+        messageDiv.textContent = `Displaying \${y.length} users and \${x.length}items`;
+
+    } catch (error) {
+        heatmapDiv.style.display = 'none';
+        messageDiv.textContent = `Error loading heatmap: \${error.message}`;
+        console.error('Heatmap error:', error);
+    }
 });
 </script>

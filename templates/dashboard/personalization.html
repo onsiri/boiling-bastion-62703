@@ -1,57 +1,45 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h2>Customer Recommendation Dashboard </h2>
-    <script>
-        // Enable HTMX to execute scripts in responses
-        htmx.config.allowScripts = true;
-    </script>
-    <!-- Main content container -->
-    <div id="main-content">
-        {% include "dashboard/partials/rec_main_content.html" %}
+<div class="layout-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">LondNet</div>
+        <ul class="sidebar-menu">
+            <li><a href="{% url 'home' %}">Home</a></li>
+            <li><a href="{% url 'about' %}">About</a></li>
+            <li><a href="{% url 'product_list' %}">Product</a></li>
+            <li class="dropdown">
+                Dashboard <span class="arrow">›</span>
+                <ul class="dropdown-menu">
+                    <li><a href="{% url 'sales_forecast' %}">Sale Forecast</a></li>
+                    <li><a href="{% url 'personalization' %}">Personalized Predictions</a></li>
+                </ul>
+            </li>
+            <li><a href="#">FAQ</a></li>
+            <li><a href="#">Settings</a></li>
+            <li><a href="{% url 'contact_us' %}">Contact Us</a></li>
+            <li><a href="{% url 'admin:index' %}">Admin</a></li>
+        </ul>
     </div>
 
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script>
-    function initCharts() {
-        // Target the actual chart container IDs (check your generated HTML)
-        ['country-plot', 'item-plot'].forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                // Re-initialize Plotly chart resizing
-                Plotly.Plots.resize(element);
-            }
-        });
-    }
+    <!-- Main Content -->
+    <div class="main-content">
+        <h2>Customer Recommendation Dashboard</h2>
 
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', initCharts);
+        <script>
+            // Ensure this comes AFTER HTMX is loaded in base.html
+            document.addEventListener("DOMContentLoaded", function() {
+                htmx.config.allowScripts = true;
+            });
+        </script>
 
-    // Reinitialize after HTMX content swap
-    document.addEventListener('htmx:afterSwap', initCharts);
-</script>
-    <script>
+        <div id="main-content">
+            {% include "dashboard/partials/rec_main_content.html" %}
+        </div>
 
-
-    // Auto-resize charts on window resize
-    function initResize(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const observer = new ResizeObserver(() => {
-            Plotly.Plots.resize(container);
-        });
-
-        observer.observe(container);
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        ['country-plot', 'item-plot'].forEach(id => {
-            if(document.getElementById(id)) {
-                initResize(id);
-            }
-        });
-    });
-    </script>
-
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <!-- Your chart scripts here -->
+    </div>
+</div>
 {% endblock %}

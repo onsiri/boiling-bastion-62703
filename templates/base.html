@@ -9,23 +9,24 @@
 
 <body>
   <div class="sidebar">
-        <div class="sidebar-header">LondNet</div>
-        <ul class="sidebar-menu">
-            <li><a href="{% url 'home' %}">Home</a></li>
-            <li><a href="{% url 'about' %}">About</a></li>
-            <li><a href="{% url 'product_list' %}">Product</a></li>
-            <li class="dropdown">Dashboard <span class="arrow">›</span>
-                <ul class="dropdown-menu">
-                <!-- Add static menu item -->
+    <div class="sidebar-header">LondNet</div>
+    <ul class="sidebar-menu">
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'about' %}">About</a></li>
+        <li><a href="{% url 'product_list' %}">Product</a></li>
+        <li class="dropdown">
+            Dashboard <span class="arrow">›</span>
+            <ul class="dropdown-menu">
                 <li><a href="{% url 'sales_forecast' %}" class="dropdown-item">Sale Forecast</a></li>
                 <li><a href="{% url 'personalization' %}" class="dropdown-item">Personalized Predictions</a></li>
-            <li>FAQ</li>
-            <li>Settings</li>
-            <li><a href="{% url 'contact_us' %}">Contact Us</a></li>
-            <li><a href="{% url 'admin:index' %}">Admin</a></li>
-        </ul>
-    </div>
-
+            </ul>
+        </li>
+        <li><a href="#">FAQ</a></li>
+        <li><a href="#">Settings</a></li>
+        <li><a href="{% url 'contact_us' %}">Contact Us</a></li>
+        <li><a href="{% url 'admin:index' %}">Admin</a></li>
+    </ul>
+</div>
     <div class="main-content">
         <div class="header">
             <div class="header-content">

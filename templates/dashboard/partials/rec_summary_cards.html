@@ -73,26 +73,29 @@
             </div>
 
             <!-- Diversity Card -->
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Recommendation Diversity</h5>
-                    <div class="d-flex align-items-center">
-                        <div class="display-4 mr-3">
-                            <span class="text-info">
-                                {{ unique_items_count|default:"N/A" }}
-                            </span>
-                        </div>
-                        <div>
-                            <small class="text-muted">
-                                Unique Items Recommended<br>
-                                <i class="fas fa-info-circle"
-                                   data-toggle="tooltip"
-                                   title="Number of distinct items recommended across all predictions"></i>
-                            </small>
+            <div class="col-md-3 mb-3">  <!-- Added column wrapper -->
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Recommendation Diversity</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="display-4 mr-3">
+                                <span class="text-info">
+                                    {{ unique_items_count|default:"N/A" }}
+                                </span>
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    Unique Items Recommended<br>
+                                    <i class="fas fa-info-circle"
+                                       data-toggle="tooltip"
+                                       title="Number of distinct items recommended across all predictions"></i>
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>  <!-- End column wrapper -->
 
-            </div>
+        </div>
+
 </div>
