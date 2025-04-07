@@ -11,6 +11,8 @@
 {{ cluster_heatmap.x|json_script:"heatmapX" }}
 {{ cluster_heatmap.y|json_script:"heatmapY" }}
 {{ cluster_heatmap.z|json_script:"heatmapZ" }}
+{{ cluster_heatmap.x_labels|json_script:"heatmapXLabels" }}
+{{ cluster_heatmap.y_labels|json_script:"heatmapYLabels" }}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -20,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const x = JSON.parse(document.getElementById('heatmapX').textContent);
         const y = JSON.parse(document.getElementById('heatmapY').textContent);
         const z = JSON.parse(document.getElementById('heatmapZ').textContent);
+        const x_labels = JSON.parse(document.getElementById('heatmapXLabels').textContent);
+        const y_labels = JSON.parse(document.getElementById('heatmapYLabels').textContent);
         const zmax = {{ cluster_heatmap.zmax|default:100 }};
 
         // Validate data
@@ -54,13 +58,18 @@ document.addEventListener('DOMContentLoaded', function() {
             xaxis: {
                 title: 'Items',
                 tickangle: 45,
+                tickvals: x,
+                ticktext: x_labels,
                 automargin: true
             },
             yaxis: {
                 title: 'Users',
+                tickvals: y,
+                ticktext: y_labels,
                 automargin: true
             }
         });
+
 
         messageDiv.textContent = 'Displaying ' + y.length + ' users and ' + x.length + ' items';
 
@@ -68,6 +77,47 @@ document.addEventListener('DOMContentLoaded', function() {
         heatmapDiv.style.display = 'none';
         messageDiv.textContent = `Error loading heatmap: \${error.message}`;
         console.error('Heatmap error:', error);
+    }
+    const topPredictedItemsDiv = document.getElementById('topPredictedItemsChart');
+    const topPredictedItemsMessageDiv = document.getElementById('topPredictedItemsMessage');
+    try {
+        const topPredictedItems = JSON.parse(document.getElementById('topPredictedItems').textContent);
+
+        // Validate data
+        if (!topPredictedItems.length) {
+            throw new Error('Missing top predicted items data');
+        }
+
+        const users = topPredictedItems.map(item => item.user);
+        const probabilities = topPredictedItems.map(item => item.probability);
+        const items = topPredictedItems.map(item => item.item);
+
+        Plotly.newPlot(topPredictedItemsDiv, [{
+            x: users,
+            y: probabilities,
+            type: 'bar',
+            hoverinfo: 'text',
+            hovertext: items,
+            text: items
+        }], {
+            margin: {t: 30, b: 120, l: 120, r: 30},
+            xaxis: {
+                title: 'User',
+                tickangle: 45,
+                automargin: true
+            },
+            yaxis: {
+                title: 'Probability (%)',
+                automargin: true
+            }
+        });
+
+        topPredictedItemsMessageDiv.textContent = `Displaying top predicted items for \${users.length} users`;
+
+    } catch (error) {
+        topPredictedItemsDiv.style.display = 'none';
+        topPredictedItemsMessageDiv.textContent = `Error loading top predicted items: \${error.message}`;
+        console.error('Top predicted items error:', error);
     }
 });
 </script>

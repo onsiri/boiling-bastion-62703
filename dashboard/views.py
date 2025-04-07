@@ -387,12 +387,12 @@ def get_personalization_context(request):
     top_users = list(NextItemPrediction.objects
                      .values_list('UserId', flat=True)
                      .annotate(count=Count('UserId'))
-                     .order_by('-count')[:10])
+                     .order_by('-count')[:50])
 
     top_items = list(NextItemPrediction.objects
-                     .values_list('PredictedItemCode', flat=True)
-                     .annotate(count=Count('PredictedItemCode'))
-                     .order_by('-count')[:10])
+                     .values_list('PredictedItemDescription', flat=True)
+                     .annotate(count=Count('PredictedItemDescription'))
+                     .order_by('-count')[:50])
 
     cluster_data = []
     for user in top_users:
@@ -402,7 +402,7 @@ def get_personalization_context(request):
             prob = (NextItemPrediction.objects
                     .filter(UserId=user, PredictedItemCode=item)
                     .aggregate(max_p=Max('Probability'))
-                    ['max_p'] or 0) * 100
+                    ['max_p'] or 0) * 1000
             row.append(round(float(prob), 2))
         cluster_data.append(row)
 
@@ -412,20 +412,38 @@ def get_personalization_context(request):
     except:
         zmax = 1
 
+    # 5. Top Predicted Items Bar Chart
+    top_users = list(NextItemPrediction.objects
+                     .values_list('UserId', flat=True)
+                     .annotate(count=Count('UserId'))
+                     .order_by('-count')[:10])
+
+    top_predicted_items = []
+    for user in top_users:
+        top_item = NextItemPrediction.objects.filter(UserId=user).order_by('-Probability').first()
+        top_predicted_items.append({
+            'user': user,
+            'item': top_item.PredictedItemCode,
+            'probability': round(float(top_item.Probability) * 100, 2)
+        })
+
     context.update({
         'total_predicted_revenue': total_revenue,
         'avg_confidence': avg_confidence,
         'arpu': arpu,
         'unique_items_count': NextItemPrediction.objects.distinct('PredictedItemCode').count(),
         'cluster_heatmap': {
-            'z': cluster_data,
-            'x': [str(i) for i in top_items],
-            'y': [str(u) for u in top_users],
-            'zmin': 0,
-            'zmax': zmax
-        },
-        'show_x_labels': len(top_items) < 20,
-        'show_y_labels': len(top_users) < 30
+        'z': cluster_data,
+        'x': [i for i in range(len(top_items))],
+        'y': [i for i in range(len(top_users))],
+        'x_labels': [str(i) for i in top_items],
+        'y_labels': [str(u) for u in top_users],
+        'zmin': 0,
+        'zmax': zmax
+    },
+    'show_x_labels': len(top_items) < 20,
+    'show_y_labels': len(top_users) < 30,
+        'top_predicted_items': top_predicted_items,
     })
     return context
 
