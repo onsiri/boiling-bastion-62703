@@ -3,12 +3,12 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Customer Purchase Probability</h2>
-        <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
-           class="btn btn-success">
-            <i class="bi bi-download"></i> Export to CSV
-        </a>
-    </div>
+            <h2>Customer Purchase Probability</h2>
+            <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+               class="btn btn-success">
+                <i class="bi bi-download"></i> Export to CSV
+            </a>
+        </div>
 
     <!-- Filter Section -->
     <div class="card mb-4">

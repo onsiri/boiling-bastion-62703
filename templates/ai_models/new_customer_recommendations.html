@@ -161,6 +161,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return cookieValue;
     }
+
+    // Add this to ensure CSRF token handling
+    function ensureCsrfToken() {
+        const csrftoken = getCookie('csrftoken');
+        if (!csrftoken) {
+            console.error('CSRF token not found');
+            alert('Security error: Please refresh the page and try again');
+        }
+        return csrftoken;
+    }
+
+    // Update the fetch call headers
+    headers: {
+        'X-CSRFToken': ensureCsrfToken(),
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
 });
 </script>
 {% endblock %}

@@ -1,4 +1,7 @@
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation
 from django.db.models import F, OuterRef, Subquery, Max
 from datetime import datetime, timedelta
@@ -12,6 +15,8 @@ import csv
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
+import logging
+logger = logging.getLogger(__name__)
 
 def top_30_sale_forecast(request):
     # Calculate date range (tomorrow + 30 days)
@@ -139,7 +144,50 @@ def future_sale_prediction(request):
     if filters['end_date']:
         base_query = base_query.filter(PredictedAt__lte=filters['end_date'])
 
-    # Sorting configuration
+    # CSV Export Handling
+    # CSV Export Handling (updated)
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        today = timezone.now().date()
+        response['Content-Disposition'] = f'attachment; filename="future_sales_{today}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'User ID', 'Prediction Date', 'Probability (%)',
+            'Item Description', 'Item Cost', 'Prediction Timestamp'
+        ])
+
+        # Get sorting parameters from request
+        sort_by = request.GET.get('sort_by', 'Probability')
+        sort_order = request.GET.get('sort_order', 'desc')
+
+        # Validate sort parameters
+        valid_sort_fields = ['UserId', 'PredictedAt', 'Probability',
+                             'PredictedItemDescription', 'PredictedItemCost']
+        if sort_by not in valid_sort_fields:
+            sort_by = 'Probability'
+            sort_order = 'desc'  # Ensure sort_order is set even if sort_by was invalid
+
+        # Always create order_by expression after validation
+        order_prefix = '-' if sort_order == 'desc' else ''
+        order_by = f'{order_prefix}{sort_by}'
+
+        try:
+            ordered = base_query.order_by(order_by, '-Probability')
+            for item in ordered:
+                writer.writerow([
+                    item.UserId,
+                    item.PredictedAt.strftime('%Y-%m-%d'),
+                    f"{item.Probability * 100:.2f}",
+                    item.PredictedItemDescription,
+                    f"\${item.PredictedItemCost:.2f}" if item.PredictedItemCost else '',
+                    item.PredictedAt.strftime('%Y-%m-%d %H:%M')
+                ])
+            return response
+        except Exception as e:
+            return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
+
+    # Sorting configuration for HTML view
     valid_sort_fields = ['UserId', 'PredictedAt', 'Probability',
                          'PredictedItemDescription', 'PredictedItemCost']
     sort_by = request.GET.get('sort_by', 'Probability')
@@ -158,7 +206,7 @@ def future_sale_prediction(request):
     ordered = base_query.order_by(order_by, '-Probability')
 
     # Pagination
-    paginator = Paginator(ordered, 20)  # 25 items per page
+    paginator = Paginator(ordered, 20)
     page_number = request.GET.get('page')
 
     try:
@@ -254,12 +302,18 @@ def new_customer_recommendations(request):
 
     return render(request, 'ai_models/new_customer_recommendations.html', context)
 
-@require_POST
+@csrf_exempt  # Changed from method_decorator
 def generate_recommendations(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
     try:
+        logger.info("Starting recommendation generation")
         call_command('generate_predictions')
+        logger.info("Recommendations generated successfully")
         return JsonResponse({'status': 'success', 'message': 'Recommendations generated successfully'})
     except Exception as e:
+        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
