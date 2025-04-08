@@ -1,61 +1,136 @@
 {% extends "base.html" %}
-{% load static %}
-
+{% block title %}New Customer Recommendations{% endblock %}
 {% block content %}
 <div class="container mt-4">
-    <<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Customer Recommendations</h2>
-    <div class="d-flex gap-2">
-
-        <button id="generate-recommendations" class="btn btn-primary">
-            <i class="bi bi-robot"></i> Generate New Recommendations
-        </button>
-        <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
-           class="btn btn-success">
-            <i class="bi bi-download"></i> Download Top 1000
-        </a>
-    </div>
-</div>
-
-    <!-- Filter Form -->
-    <form id="recommendation-filter" class="mb-4">
-    <div class="row g-3 align-items-end">
-        <div class="col-md-2">
-            <input type="text" name="customer_id" class="form-control"
-                   placeholder="Customer ID" value="{{ request.GET.customer_id }}">
-        </div>
-        <div class="col-md-2">
-            <input type="text" name="name" class="form-control"
-                   placeholder="Customer Name" value="{{ request.GET.name }}">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="min_age" class="form-control"
-                   placeholder="Min Age" value="{{ request.GET.min_age }}">
-        </div>
-        <div class="col-md-2">
-            <select name="gender" class="form-select">
-                <option value="">All Genders</option>
-                <option value="M" {% if request.GET.gender == 'M' %}selected{% endif %}>Male</option>
-                <option value="F" {% if request.GET.gender == 'F' %}selected{% endif %}>Female</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="min_confidence" class="form-control"
-                   placeholder="Min Confidence" step="0.01" min="0" max="1"
-                   value="{{ request.GET.min_confidence }}">
-        </div>
-        <div class="col-md-2">
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary w-100">Filter</button>
-                <a href="?" class="btn btn-secondary w-100">Clear</a>
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>New Customer Recommendations</h2>
+        <div>
+            <button id="generate-recommendations" class="btn btn-primary me-2">
+                Generate Recommendations
+            </button>
+            <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+               class="btn btn-success">
+                <i class="bi bi-download"></i> Export CSV
+            </a>
         </div>
     </div>
-</form>
 
-    <!-- Table Container -->
-    {% include 'ai_models/new_customer_recommendations_table.html' %}
+    <!-- Filter Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="recommendation-filter" method="GET" class="form-inline">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <input type="text" class="form-control" name="user_filter"
+                               value="{{ filters.user_filter }}" placeholder="User ID">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control" name="item_filter"
+                               value="{{ filters.item_filter }}" placeholder="Item Code">
+                    </div>
+                    <div class="col-md-2">
+                        <select name="rec_type" class="form-select">
+                            <option value="">All Types</option>
+                            {% for type in rec_types %}
+                            <option value="{{ type.0 }}" {% if filters.rec_type == type.0 %}selected{% endif %}>
+                                {{ type.1 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="min_confidence"
+                               value="{{ filters.min_confidence }}" placeholder="Min Confidence">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" step="0.01" class="form-control" name="max_confidence"
+                               value="{{ filters.max_confidence }}" placeholder="Max Confidence">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" name="start_date"
+                               value="{{ filters.start_date }}" placeholder="Start Date">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" name="end_date"
+                               value="{{ filters.end_date }}" placeholder="End Date">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" name="expiry_date"
+                               value="{{ filters.expiry_date }}" placeholder="Expiry Date">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="?" class="btn btn-outline-secondary w-100">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
+    <!-- Recommendations Table -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId">User ID {% if sort_field == 'user__UserId' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}item_code">Item Code {% if sort_field == 'item_code' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type">Type {% if sort_field == 'recommendation_type' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score">Confidence {% if sort_field == 'confidence_score' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th>Generated Date</th>
+                    <th>Expiry Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in page_obj %}
+                <tr>
+                    <td>{{ rec.user.UserId }}</td>
+                    <td>{{ rec.item_code }}</td>
+                    <td>{{ rec.get_recommendation_type_display }}</td>
+                    <td>{{ rec.confidence_score|floatformat:2 }}</td>
+                    <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
+                    <td>{{ rec.expiry_date|date:"Y-m-d H:i"|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No recommendations found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Recommendation pagination">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">&laquo; First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -63,121 +138,111 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const generateBtn = document.getElementById('generate-recommendations');
-    let isLoading = false;
+    const statusMessage = document.getElementById('status-message');
 
     // Generate Recommendations Handler
     if (generateBtn) {
-        generateBtn.addEventListener('click', function(e) {
+        generateBtn.addEventListener('click', async function(e) {
             e.preventDefault();
-            const btn = this;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
 
-            fetch("{% url 'ai_models:generate_recommendations' %}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Accept': 'application/json',
-                },
-                credentials: 'same-origin'
-            })
-            .then(response => {
+            const confirmed = confirm("This will generate new recommendations. Continue?");
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch("{% url 'ai_models:generate_recommendations' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Accept': 'application/json',
+                    },
+                });
+
                 if (!response.ok) throw new Error(`HTTP error! status: \${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if(data.status === 'success') {
-                    window.location.reload();
+
+                const data = await response.json();
+                if (data.task_id) {
+                    pollTaskStatus(data.task_id);
                 } else {
-                    throw new Error(data.message || 'Unknown error occurred');
+                    throw new Error('No task ID received');
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error: ' + error.message);
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-robot"></i> Generate New Recommendations';
-            });
+            } catch (error) {
+                console.error('Generation error:', error);
+                alert(`Error: \${error.message}`);
+            }
         });
     }
 
-    // Sorting Handler
-    document.querySelectorAll('.rec-sort-header').forEach(header => {
-        header.addEventListener('click', function(e) {
-            e.preventDefault();
-            const sortUrl = this.href;
-            window.location.href = sortUrl;
-        });
-    });
+    // Task Status Poller
+    function pollTaskStatus(taskId) {
+        let attempts = 0;
+        const maxAttempts = 30;
+        const pollInterval = 2000;
 
-    // Filter Form Handler
+        const checkStatus = async () => {
+            attempts++;
+            try {
+                const response = await fetch(`{% url 'ai_models:check_task_status' %}?task_id=\${taskId}`);
+                const data = await response.json();
+
+                switch (data.status) {
+                    case 'SUCCESS':
+                        window.location.reload();
+                        break;
+                    case 'FAILURE':
+                        alert(`Failed: \${data.result || 'Unknown error'}`);
+                        break;
+                    case 'PENDING':
+                    case 'STARTED':
+                        if (attempts < maxAttempts) {
+                            setTimeout(checkStatus, pollInterval);
+                        } else {
+                            alert('Task timeout. Check server logs.');
+                        }
+                        break;
+                    default:
+                        alert(`Unknown status: \${data.status}`);
+                }
+            } catch (error) {
+                console.error('Status check error:', error);
+                alert('Status check failed');
+            }
+        };
+
+        checkStatus();
+    }
+
+    // Filter and Sorting Handlers (Same as future_sale.html)
     document.getElementById('recommendation-filter').addEventListener('submit', function(e) {
         e.preventDefault();
-        const params = new URLSearchParams(new FormData(this));
+        const formData = new FormData(this);
+        const params = new URLSearchParams(formData);
         window.location.search = params.toString();
     });
-    document.getElementById('download-btn').addEventListener('click', async function() {
-    // Get the current filter parameters from the URL
-    const urlParams = new URLSearchParams(window.location.search);
 
-    // Get the data from the API
-    const response = await fetch(`?download=true&\${urlParams.toString()}`);
-    const data = await response.json();
+    document.querySelectorAll('.sort-header').forEach(header => {
+        header.addEventListener('click', function(e) {
+            e.preventDefault();
+            const currentParams = new URLSearchParams(window.location.search);
+            const linkParams = new URLSearchParams(this.href.split('?')[1]);
+            linkParams.forEach((value, key) => currentParams.set(key, value));
+            currentParams.delete('page');
+            window.location.search = currentParams.toString();
+        });
+    });
 
-    // Convert the data to CSV
-    const csvData = data.map(item => Object.values(item).join(',')).join('\n');
-    const csvHeader = Object.keys(data[0]).join(',');
-    const csv = `\${csvHeader}\n\${csvData}`;
-
-    // Create a blob to hold the CSV data
-    const blob = new Blob([csv], { type: 'text/csv' });
-
-    // Create a URL for the blob
-    const url = URL.createObjectURL(blob);
-
-    // Create a link to download the CSV file
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'customer-recommendations.csv';
-    a.click();
-
-    // Clean up
-    URL.revokeObjectURL(url);
-});
-    // CSRF Cookie Helper
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.startsWith(name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
+    document.querySelectorAll('.page-link').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href) {
+            const params = new URLSearchParams(href.split('?')[1]);
+            const currentParams = new URLSearchParams(window.location.search);
+            currentParams.forEach((value, key) => {
+                if (key !== 'page' && !params.has(key)) {
+                    params.set(key, value);
                 }
-            }
+            });
+            link.setAttribute('href', `?\${params.toString()}`);
         }
-        return cookieValue;
-    }
-
-    // Add this to ensure CSRF token handling
-    function ensureCsrfToken() {
-        const csrftoken = getCookie('csrftoken');
-        if (!csrftoken) {
-            console.error('CSRF token not found');
-            alert('Security error: Please refresh the page and try again');
-        }
-        return csrftoken;
-    }
-
-    // Update the fetch call headers
-    headers: {
-        'X-CSRFToken': ensureCsrfToken(),
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
+    });
 });
 </script>
 {% endblock %}

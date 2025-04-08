@@ -14,7 +14,8 @@ from django.http import HttpResponse
 import csv
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
+from .tasks import generate_predictions_task
+from celery.result import AsyncResult
 import logging
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,18 @@ def future_sale_prediction(request):
 
     return render(request, 'ai_models/future_sale.html', context)
 
-def new_customer_recommendations(request):
+
+
+@csrf_exempt
+def generate_recommendations(request):
+    if request.method == 'POST':
+        task = generate_predictions_task.delay()
+        return JsonResponse({'task_id': task.id})
+    else:
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+
+def customer_recommendations(request):
     # Filter parameters
     filters = {
         'user_filter': request.GET.get('user_filter', '').strip(),
@@ -285,46 +297,11 @@ def new_customer_recommendations(request):
         sort_field = 'confidence_score'
         sort_order = 'desc'
 
-    # Final ordering
-    ordered = base_query.order_by(sort_by, '-generation_date')
+    base_query = base_query.order_by(sort_by, '-generation_date')
 
-    context = {
-        'recommendations': ordered,
-        'filters': filters,
-        'sort_by': sort_field,
-        'sort_order': sort_order,
-        'rec_types': NewCustomerRecommendation.RecommendationType.choices,
-        'request': request
-    }
-
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'ai_models/new_customer_recommendations_table.html', context)
-
-    return render(request, 'ai_models/new_customer_recommendations.html', context)
-
-@csrf_exempt  # Changed from method_decorator
-def generate_recommendations(request):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
-
-    try:
-        logger.info("Starting recommendation generation")
-        call_command('generate_predictions')
-        logger.info("Recommendations generated successfully")
-        return JsonResponse({'status': 'success', 'message': 'Recommendations generated successfully'})
-    except Exception as e:
-        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-def customer_recommendations(request):
-    recommendations = NewCustomerRecommendation.objects.all().order_by('-confidence_score')
-
-    # Add your filter logic here
+    # Handle CSV export
     if 'export' in request.GET:
-        # Apply the same filters but get 1000 records
-        queryset = recommendations[:1000]
-
+        queryset = base_query[:1000]  # Get top 1000 filtered records
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="customer_recommendations.csv"'
 
@@ -343,14 +320,35 @@ def customer_recommendations(request):
                 rec.generation_date.strftime("%Y-%m-%d %H:%M"),
                 rec.expiry_date.strftime("%Y-%m-%d %H:%M") if rec.expiry_date else ''
             ])
-
         return response
-    paginator = Paginator(recommendations, 20)
+
+    # Pagination
+    paginator = Paginator(base_query, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'ai_models/new_customer_recommendations.html', {
-        'page_obj': page_obj,  # Make sure this key is used
-        'recommendations': page_obj.object_list,
-    })
+    context = {
+        'page_obj': page_obj,
+        'filters': filters,
+        'sort_by': sort_field,
+        'sort_order': sort_order,
+        'rec_types': NewCustomerRecommendation.RecommendationType.choices,
+        'request': request
+    }
 
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'ai_models/new_customer_recommendations_table.html', context)
+
+    return render(request, 'ai_models/new_customer_recommendations.html', context)
+
+
+def check_task_status(request):
+    task_id = request.GET.get('task_id')  # Get task_id from query parameters
+    if not task_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing task_id'}, status=400)
+
+    result = AsyncResult(task_id)
+    return JsonResponse({
+        'status': result.state,
+        'result': result.result if result.ready() else None
+    })

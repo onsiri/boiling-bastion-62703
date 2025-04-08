@@ -17,11 +17,17 @@ RUN pip install -r requirements.txt
 # Copy project
 COPY . .
 
+# Install django-celery-beat
+RUN pip install django-celery-beat
+
+
 # Expose the port
 EXPOSE 8000
 
 # Collect static files
 #RUN python manage.py collectstatic --noinput
+
+#ENV REDIS_URL=redis://localhost:6379
 
 # Run the command to start the Gunicorn server
 CMD ["gunicorn", "django_project.wsgi:application", "--workers", "3", "--bind", "0.0.0.0:8000"]

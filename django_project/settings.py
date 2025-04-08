@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'products.apps.ProductsConfig',
     'ai_models',
     'dashboard',
+    'celery',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -165,11 +167,14 @@ PLOTLY_COMPONENTS = [
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CELERY_BROKER_URL = os.environ['REDIS_URL']
-CELERY_RESULT_BACKEND = os.environ['REDIS_URL']
+#CELERY_BROKER_URL = os.environ['REDIS_URL']
+#CELERY_RESULT_BACKEND = os.environ['REDIS_URL']
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes timeout for tasks
+CELERY_WORKER_STATE_DB = '/tmp/celery_worker_state.db'
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Using Redis
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 
@@ -192,6 +197,6 @@ REDIS_CONNECTION = {
     'host': url.hostname,
     'port': url.port,
     'password': url.password,
-    'ssl': REDIS_URL.startswith('rediss'),
+    'ssl': REDIS_URL.startswith('redis'),
     'ssl_cert_reqs': None
 }

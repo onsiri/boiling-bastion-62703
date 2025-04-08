@@ -1,12 +1,14 @@
+from __future__ import absolute_import, unicode_literals
 import os
-import ssl
-
 from celery import Celery
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_project.settings')
-app = Celery('django_project', broker=os.environ.get('REDIS_URL', 'redis://localhost:6379/0'))
+
+app = Celery('django_project')
 app.config_from_object('django.conf:settings', namespace='CELERY')
-# Heroku Redis TLS fix
-app.conf.broker_use_ssl = {'ssl_cert_reqs': ssl.CERT_NONE}
-app.conf.redis_backend_use_ssl = {'ssl_cert_reqs': ssl.CERT_NONE}
+
+# Optional: Add worker state DB configuration
+app.conf.worker_state_db = '/tmp/celery_worker_state.db'  # For Linux/Mac
+# app.conf.worker_state_db = 'C:\\celery_worker_state.db'  # For Windows
+
 app.autodiscover_tasks()

@@ -1,6 +1,7 @@
 <div id="recommendation-table" class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
+            {% if page_obj %}
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
@@ -13,73 +14,80 @@
                     </tr>
                 </thead>
                 <tbody>
-    {% for rec in page_obj %}  <!-- Changed from recommendations -->
-    <tr>
-        <td>{{ rec.user.UserId }}</td>
-        <td>{{ rec.item_code }}</td>
-        <td>{{ rec.get_recommendation_type_display }}</td>
-        <td>{{ rec.confidence_score|floatformat:2 }}</td>
-        <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
-        <td>
-            {% if rec.expiry_date %}
-                {{ rec.expiry_date|date:"Y-m-d H:i" }}
-            {% else %}
-                -
-            {% endif %}
-        </td>
-    </tr>
-    {% empty %}
-    <tr>
-        <td colspan="6" class="text-center">No recommendations found</td>
-    </tr>
-    {% endfor %}
-</tbody>
+                    {% for rec in page_obj %}
+                    <tr>
+                        <td>{{ rec.user.UserId }}</td>
+                        <td>{{ rec.item_code }}</td>
+                        <td>{{ rec.get_recommendation_type_display }}</td>
+                        <td>{{ rec.confidence_score|floatformat:2 }}</td>
+                        <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            {% if rec.expiry_date %}
+                                {{ rec.expiry_date|date:"Y-m-d H:i" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">No recommendations found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
 
             <!-- Pagination -->
+            <div class="pagination mt-4">
+                <ul class="pagination-list d-flex flex-wrap gap-2 list-unstyled">
+                    {% if page_obj.has_previous %}
+                        <li>
+                            <a href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="page-link">&laquo;</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="page-link">Prev</a>
+                        </li>
+                    {% endif %}
 
-<div class="pagination mt-4">
-    <ul class="pagination-list d-flex flex-wrap gap-2 list-unstyled">
-        {% if page_obj.has_previous %}
-            <li>
-                <a href="?page=1" class="page-link">&laquo;</a>
-            </li>
-            <li>
-                <a href="?page={{ page_obj.previous_page_number }}" class="page-link">Prev</a>
-            </li>
-        {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li>
+                                <span class="page-link active">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                            <li>
+                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">{{ num }}</a>
+                            </li>
+                        {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                            <li>
+                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">{{ num }}</a>
+                            </li>
+                        {% elif num == page_obj.number|add:-3 or num == page_obj.number|add:3 %}
+                            <li class="disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
 
-        {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-                <li>
-                    <span class="page-link active">{{ num }}</span>
-                </li>
-            {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
-                <li>
-                    <a href="?page={{ num }}" class="page-link">{{ num }}</a>
-                </li>
-            {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                <li>
-                    <a href="?page={{ num }}" class="page-link">{{ num }}</a>
-                </li>
-            {% elif num == page_obj.number|add:-3 or num == page_obj.number|add:3 %}
-                <li class="disabled">
-                    <span class="page-link">...</span>
-                </li>
+                    {% if page_obj.has_next %}
+                        <li>
+                            <a href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="page-link">Next</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="page-link">&raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">No recommendations available. Try generating some first!</div>
             {% endif %}
-        {% endfor %}
-
-        {% if page_obj.has_next %}
-            <li>
-                <a href="?page={{ page_obj.next_page_number }}" class="page-link">Next</a>
-            </li>
-            <li>
-                <a href="?page={{ page_obj.paginator.num_pages }}" class="page-link">&raquo;</a>
-            </li>
-        {% endif %}
-    </ul>
-</div>
-
         </div>
     </div>
 </div>

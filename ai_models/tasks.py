@@ -13,10 +13,24 @@ from django.db import connection
 import pandas as pd
 from django.utils import timezone
 import logging
+from .management.commands.generate_predictions import PredictionPipeline
+from celery.utils.log import get_task_logger
+
+logger = get_task_logger(__name__)
 
 
 
-logger = logging.getLogger(__name__)
+@shared_task(bind=True)
+def generate_predictions_task(self):
+    try:
+        logger.info("Starting prediction pipeline")
+        pipeline = PredictionPipeline()
+        pipeline.run()
+        return "Predictions generated successfully"
+    except Exception as e:
+        logger.error(f"Task failed: {str(e)}")
+        raise self.retry(exc=e, countdown=60)  # Retry after 60 seconds
+
 
 
 @shared_task
