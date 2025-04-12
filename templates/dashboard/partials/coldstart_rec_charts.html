@@ -1,0 +1,64 @@
+{% load static %}
+<div class="row mb-4">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Geospatial Analysis</h5>
+            </div>
+            <div class="card-body p-0" style="height: 600px;">
+                <div id="trendingMap"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize map with fallback coordinates
+    const map = L.map('trendingMap').setView([54.0, -2.0], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const markers = L.markerClusterGroup();
+
+    // Scoped marker creation
+    {% for loc in geospatial_data %}
+    (function() {
+        {% if loc.latitude and loc.longitude %}
+        const popupContent = `
+            <div class="map-popup">
+                <h6>\${ {{ loc.total_recommendations }} } Recommendations</h6>
+                <p><strong>Country:</strong> {{ loc.country|escapejs }}</p>
+                <ol>
+                    {% for item in loc.top_items %}
+                    <li>{{ item.name|escapejs }} ({{ item.count }})</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        `;
+
+        const marker = L.marker([{{ loc.latitude }}, {{ loc.longitude }}])
+            .bindPopup(popupContent);
+        markers.addLayer(marker);
+        {% endif %}
+    })();
+    {% endfor %}
+
+    map.addLayer(markers);
+});
+</script>
+
+<style>
+#trendingMap {
+    height: 600px !important;
+    width: 100%;
+    border-radius: 8px;
+}
+</style>

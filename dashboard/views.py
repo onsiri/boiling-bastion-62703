@@ -1,27 +1,23 @@
 from decimal import Decimal
-
-from django.shortcuts import render
-from django.http import JsonResponse, HttpResponse
-from django.core import serializers
+from django.db.models import Case, When, IntegerField
+from django.utils import timezone
+from datetime import timedelta
+from django.http import HttpResponse
 from django.core.cache import cache
-from ai_models.models import CountrySaleForecast
 from django.http import JsonResponse
 from django.core import serializers
 import boto3
 from datetime import datetime
-import numpy as np
 from django_project import settings
 from django.shortcuts import render
 from plotly.offline import plot
 import plotly.graph_objects as pgo
-from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction
+from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction, Item, NewCustomerRecommendation, CustomerDetail
 from django.db.models import Sum, Max, Q, Subquery, OuterRef, F, ExpressionWrapper, DecimalField, Avg, Count
 from django.db.models.functions import TruncMonth
-from django.template.loader import render_to_string
-from django.db.models.functions import Coalesce
 from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
 import pandas as pd
+
 
 def export_to_s3(request):
     # Serialize data
@@ -467,3 +463,133 @@ def personalization_view(request):
     context = get_personalization_context(request)
     return render(request, 'dashboard/personalization.html', context)
 
+COUNTRY_COORDINATES = {
+    # Existing entries
+    'United Kingdom': (55.3781, -3.4360),
+    'Germany': (51.1657, 10.4515),
+    'France': (46.6035, 1.8883),
+    'EIRE': (53.1759, -8.1526),  # Ireland
+    'Spain': (40.4637, -3.7492),
+    'Netherlands': (52.1326, 5.2913),
+    'Switzerland': (46.8182, 8.2275),
+    'Belgium': (50.5039, 4.4699),
+    'Portugal': (39.3999, -8.2245),
+    'Australia': (-25.2744, 133.7751)
+}
+def split_item_code(item_code):
+    """Clean parentheses and quotes from item codes"""
+    clean_code = item_code.strip(" ()'")  # Remove surrounding parentheses/quotes
+    return [part.strip(" '") for part in clean_code.split(',')]
+
+def get_new_customer_rec_context(request):
+    context = {}
+    now = timezone.now()
+
+    # Existing metrics calculation
+    total_recommendations = NewCustomerRecommendation.objects.count()
+
+    avg_confidence = NewCustomerRecommendation.objects.aggregate(
+        avg_confidence=Avg('confidence_score')
+    )['avg_confidence'] or 0
+    avg_confidence_percent = round(avg_confidence * 100, 1)
+
+    status_counts = NewCustomerRecommendation.objects.aggregate(
+        active=Count(
+            Case(
+                When(
+                    Q(expiry_date__gt=now) |
+                    Q(expiry_date__isnull=True, generation_date__gte=now - timedelta(days=30)),
+                    then=1
+                ),
+                output_field=IntegerField()
+            )
+        ),
+        expired=Count(
+            Case(
+                When(
+                    Q(expiry_date__lte=now) |
+                    Q(expiry_date__isnull=True, generation_date__lt=now - timedelta(days=30)),
+                    then=1
+                ),
+                output_field=IntegerField()
+            )
+        )
+    )
+
+    # Most Recommended Item
+    most_recommended = NewCustomerRecommendation.objects.values('item_code') \
+        .annotate(count=Count('id')) \
+        .order_by('-count') \
+        .first()
+
+    item_info = {'code': None, 'name': None, 'count': 0}
+    if most_recommended:
+        item_parts = most_recommended['item_code'].split(',')
+        item_info.update({
+            'code': item_parts[0].strip() if len(item_parts) >= 1 else most_recommended['item_code'],
+            'name': item_parts[1].strip() if len(item_parts) >= 2 else "Invalid format",
+            'count': most_recommended['count']
+        })
+
+    # Geospatial Data
+    country_stats = (
+        CustomerDetail.objects
+        .filter(recommendations__isnull=False)
+        .values('country')
+        .annotate(total=Count('recommendations'))
+        .order_by('-total')[:10]  # Get top 10 countries
+    )
+
+    geospatial_data = []
+    for stat in country_stats:
+        # Get country coordinates
+        lat, lng = COUNTRY_COORDINATES.get(stat['country'], (0, 0))
+
+        # Get top 5 items for this country
+        top_items = (
+            NewCustomerRecommendation.objects
+            .filter(user__country=stat['country'])
+            .values('item_code')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:5]
+        )
+
+        # Process item codes
+        processed_items = []
+        for item in top_items:
+            parts = split_item_code(item['item_code'])
+            processed_items.append({
+                'code': parts[0] if len(parts) >= 1 else item['item_code'],
+                'name': parts[1] if len(parts) >= 2 else "Invalid format",
+                'count': item['count']
+            })
+
+        geospatial_data.append({
+            'country': stat['country'],
+            'latitude': lat,
+            'longitude': lng,
+            'total_recommendations': stat['total'],
+            'top_items': processed_items
+        })
+        print("Geospatial data sample:", geospatial_data[:2])  # Add this line
+
+    context.update({
+        'total_recommendations': total_recommendations,
+        'avg_confidence': avg_confidence_percent,
+        'active_recommendations': status_counts.get('active', 0),
+        'expired_recommendations': status_counts.get('expired', 0),
+        'most_recommended_code': item_info['code'],
+        'most_recommended_name': item_info['name'],
+        'most_recommended_count': item_info['count'],
+        'geospatial_data': geospatial_data,
+        'default_lat': 37.0902,
+        'default_lng': -95.7129
+    })
+
+    return context
+
+
+@cache_page(60 * 15, cache="default")
+def new_customer_rec_view(request):
+    context = get_new_customer_rec_context(request)
+    return render(request, 'dashboard/new_customer_rec.html', context)

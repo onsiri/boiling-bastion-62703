@@ -1,0 +1,117 @@
+<div class="summary-cards mb-4">
+    <div class="row justify-content-center">
+        <!-- Total Recommendations -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <h5 class="card-title mb-3">Total Recommendations</h5>
+                    <div class="d-flex justify-content-center align-items-center flex-grow-1">
+                        <div class="display-4 mr-3">
+                            {% if total_recommendations is not None %}
+                                <span class="text-primary">
+                                    {{ total_recommendations }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-left ml-3">
+                            <small class="text-muted d-block">
+                                Recommendations generated
+                            </small>
+                            <i class="fas fa-info-circle"
+                               data-toggle="tooltip"
+                               title="Total cold-start recommendations created"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg Confidence -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <h5 class="card-title mb-3">Avg Confidence</h5>
+                    <div class="d-flex justify-content-center align-items-center flex-grow-1">
+                        <div class="display-4 mr-3">
+                            {% if avg_confidence is not None %}
+                                <span class="{% if avg_confidence >= 50 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ avg_confidence }}%
+                                </span>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-left ml-3">
+                            <small class="text-muted d-block">
+                                Average confidence score
+                            </small>
+                            <i class="fas fa-info-circle"
+                               data-toggle="tooltip"
+                               title="Average confidence across all recommendations"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations Status -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <h5 class="card-title mb-3">Recommendation Status</h5>
+                    <div class="d-flex justify-content-around align-items-center flex-grow-1">
+                        <div class="text-center">
+                            <div class="h2 text-success mb-1">{{ active_recommendations }}</div>
+                            <small class="text-muted">Active</small>
+                        </div>
+                        <div class="text-center">
+                            <div class="h2 text-danger mb-1">{{ expired_recommendations }}</div>
+                            <small class="text-muted">Expired</small>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2">
+                        <i class="fas fa-info-circle mr-1"
+                           data-toggle="tooltip"
+                           title="Active = Valid recommendations (either within expiry date or last 30 days)"></i>
+                        Status definitions
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Recommended Item -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <h5 class="card-title mb-3">Most Recommended</h5>
+                    <div class="d-flex justify-content-center align-items-center flex-grow-1">
+                        <div class="display-4 mr-3">
+                            {% if most_recommended_count %}
+                                <span class="text-info">
+                                    {{ most_recommended_count }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                            <div class="text-left ml-3">
+                                <small class="text-muted d-block">
+                                    {% if most_recommended_count %}
+                                        {{ most_recommended_name|truncatechars:20 }}
+                                        <span class="text-secondary d-block">Top item</span>
+                                    {% else %}
+                                        No recommendations
+                                    {% endif %}
+                                </small>
+                                <i class="fas fa-info-circle"
+                                   data-toggle="tooltip"
+                                   title="Most recommended item: {{ most_recommended_code }}"></i>
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

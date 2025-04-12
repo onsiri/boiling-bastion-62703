@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
-    <h2>Customer Recommendation Dashboard</h2>
+    <h2>New Customer Recommendation Dashboard</h2>
 
     <!-- Enable HTMX scripts -->
     <script>
@@ -10,24 +11,23 @@
         });
     </script>
 
-    <!-- Main content container (identical structure to sales_forecast.html) -->
+    <!-- Main content container -->
     <div id="main-content">
-        {% include "dashboard/partials/rec_main_content.html" %}
+        {% include "dashboard/partials/coldstart_main_content.html" %}
     </div>
 
     <!-- Plotly library -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-    <!-- Chart initialization script (same pattern as sales_forecast) -->
+    <!-- Chart initialization script -->
     <script>
-    // Initialize charts - same structure as working sales_forecast.html
+    // Initialize charts
     function initCharts() {
-        // Initialize both heatmaps
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
+        // Add chart initialization logic here if needed
+        ['geo-plot', 'trending-plot'].forEach(id => {
             const element = document.getElementById(id);
             if (element) {
-                // Force redraw to fix layout issues
-                Plotly.newPlot(element, element.data, element.layout);
+                Plotly.Plots.resize(element);
             }
         });
     }
@@ -47,20 +47,20 @@
     // Initial load
     document.addEventListener('DOMContentLoaded', function() {
         initCharts();
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
+        ['geo-plot', 'trending-plot'].forEach(initResize);
     });
 
     // HTMX content swap handler
     document.addEventListener('htmx:afterSwap', function() {
         setTimeout(() => {
             initCharts();
-            ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
+            ['geo-plot', 'trending-plot'].forEach(initResize);
         }, 50);
     });
 
     // Window resize handler
     window.addEventListener('resize', function() {
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
+        ['geo-plot', 'trending-plot'].forEach(id => {
             Plotly.Plots.resize(document.getElementById(id));
         });
     });

@@ -1,9 +1,24 @@
-<div class="col-md-12 mb-4">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title">Customer Preference Clusters</h5>
-            <div id="clusterHeatmap" style="height: 500px;"></div>
-            <div id="heatmapMessage" class="text-muted small mt-2"></div>
+<!-- dashboard/partials/rec_charts.html -->
+<div class="row">  <!-- Added row wrapper -->
+    <!-- Cluster Heatmap -->
+    <div class="col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Customer Preference Clusters</h5>
+                <div id="clusterHeatmap" style="height: 500px;"></div>
+                <div id="heatmapMessage" class="text-muted small mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Affinity Heatmap -->
+    <div class="col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Item Affinity</h5>
+                <div id="itemAffinityHeatmap" style="height: 500px;"></div>
+                <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -18,39 +33,38 @@
 {{ item_affinity.x|json_script:"itemAffinityX" }}
 {{ item_affinity.y|json_script:"itemAffinityY" }}
 
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const heatmapDiv = document.getElementById('clusterHeatmap');
-    const messageDiv = document.getElementById('heatmapMessage');
+    // Common configuration
+    const config = {
+        responsive: true,
+        scrollZoom: false
+    };
+
+    // Initialize Cluster Heatmap
     try {
+        const heatmapDiv = document.getElementById('clusterHeatmap');
+        const messageDiv = document.getElementById('heatmapMessage');
+
         const x = JSON.parse(document.getElementById('heatmapX').textContent);
         const y = JSON.parse(document.getElementById('heatmapY').textContent);
         const z = JSON.parse(document.getElementById('heatmapZ').textContent);
-        const x_labels = JSON.parse(document.getElementById('heatmapXLabels').textContent);
-        const y_labels = JSON.parse(document.getElementById('heatmapYLabels').textContent);
+        const xLabels = JSON.parse(document.getElementById('heatmapXLabels').textContent);
+        const yLabels = JSON.parse(document.getElementById('heatmapYLabels').textContent);
         const zmax = {{ cluster_heatmap.zmax|default:100 }};
 
-        // Validate data
-        if (!x.length || !y.length || !z.length) {
-            throw new Error('Missing heatmap data');
-        }
-
-        // Force minimum color contrast
-        const colorscale = [
-            [0, '#F0F0F0'],
-            [0.01, '#FFEDA0'],  // Show faint color even for 1%
-            [0.1, '#FEB24C'],
-            [0.5, '#FC4E2A'],
-            [1, '#B10026']
-        ];
-
-        Plotly.newPlot(heatmapDiv, [{
+        const clusterData = [{
             x: x,
             y: y,
             z: z,
             type: 'heatmap',
-            colorscale: colorscale,
+            colorscale: [
+                [0, '#F0F0F0'],
+                [0.01, '#FFEDA0'],
+                [0.1, '#FEB24C'],
+                [0.5, '#FC4E2A'],
+                [1, '#B10026']
+            ],
             zmin: 0,
             zmax: zmax,
             hoverinfo: 'x+y+z',
@@ -58,74 +72,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: 'Probability (%)',
                 tickformat: '.1f%'
             }
-        }], {
+        }];
+
+        const clusterLayout = {
             margin: {t: 30, b: 120, l: 120, r: 30},
             xaxis: {
                 title: 'Items',
                 tickangle: 45,
                 tickvals: x,
-                ticktext: x_labels,
+                ticktext: xLabels,
                 automargin: true
             },
             yaxis: {
                 title: 'Users',
                 tickvals: y,
-                ticktext: y_labels,
+                ticktext: yLabels,
                 automargin: true
             }
-        });
+        };
 
-        messageDiv.textContent = 'Displaying ' + y.length + ' users and ' + x.length + ' items';
-
+        Plotly.newPlot(heatmapDiv, clusterData, clusterLayout, config);
+        messageDiv.textContent = `Displaying \${y.length} users and \${x.length} items`;
     } catch (error) {
-        heatmapDiv.style.display = 'none';
-        messageDiv.textContent = `Error loading heatmap: \${error.message}`;
-        console.error('Heatmap error:', error);
+        console.error('Cluster Heatmap Error:', error);
+        document.getElementById('clusterHeatmap').style.display = 'none';
+        document.getElementById('heatmapMessage').textContent =
+            `Error loading cluster heatmap: \${error.message}`;
     }
 
-});
-</script>
-
-<!-- Add this after the existing cluster heatmap div -->
-<div class="col-md-12 mb-4">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title">Item Affinity</h5>
-            <div id="itemAffinityHeatmap" style="height: 500px;"></div>
-            <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Existing cluster heatmap code here...
-
-    // Item Affinity Heatmap
-    const itemAffinityHeatmapDiv = document.getElementById('itemAffinityHeatmap');
-    const itemAffinityMessageDiv = document.getElementById('itemAffinityMessage');
+    // Initialize Item Affinity Heatmap
     try {
+        const affinityDiv = document.getElementById('itemAffinityHeatmap');
+        const messageDiv = document.getElementById('itemAffinityMessage');
+
         const x = JSON.parse(document.getElementById('itemAffinityX').textContent);
         const y = JSON.parse(document.getElementById('itemAffinityY').textContent);
         const z = JSON.parse(document.getElementById('itemAffinityZ').textContent);
 
-        if (!x.length || !y.length || !z.length) {
-            throw new Error('Missing item affinity data');
-        }
-
-        const colorscale = [
-            [0, '#F0F0F0'],
-            [0.01, '#9ECAE1'],
-            [0.5, '#4292C6'],
-            [1, '#084594']
-        ];
-
-        Plotly.newPlot(itemAffinityHeatmapDiv, [{
+        const affinityData = [{
             x: x,
             y: y,
             z: z,
             type: 'heatmap',
-            colorscale: colorscale,
+            colorscale: [
+                [0, '#F0F0F0'],
+                [0.01, '#9ECAE1'],
+                [0.5, '#4292C6'],
+                [1, '#084594']
+            ],
             zmin: 0,
             zmax: 1,
             hoverinfo: 'x+y+z',
@@ -133,7 +127,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: 'Affinity',
                 tickformat: '.0%'
             }
-        }], {
+        }];
+
+        const affinityLayout = {
             margin: {t: 30, b: 120, l: 120, r: 30},
             xaxis: {
                 title: 'Items',
@@ -144,14 +140,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: 'Items',
                 automargin: true
             }
-        });
+        };
 
-        itemAffinityMessageDiv.textContent = 'Displaying affinity between' + x.length + 'items';
-
+        Plotly.newPlot(affinityDiv, affinityData, affinityLayout, config);
+        messageDiv.textContent = `Displaying affinity between \${x.length} items`;
     } catch (error) {
-        itemAffinityHeatmapDiv.style.display = 'none';
-        itemAffinityMessageDiv.textContent = `Error loading affinity heatmap: \${error.message}`;
-        console.error('Affinity heatmap error:', error);
+        console.error('Affinity Heatmap Error:', error);
+        document.getElementById('itemAffinityHeatmap').style.display = 'none';
+        document.getElementById('itemAffinityMessage').textContent =
+            `Error loading affinity heatmap: \${error.message}`;
     }
 });
+
+// Handle resizing
+function handleResize() {
+    ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
+        const element = document.getElementById(id);
+        if(element) Plotly.Plots.resize(element);
+    });
+}
+
+// Add event listeners
+window.addEventListener('resize', handleResize);
+document.addEventListener('htmx:afterSwap', handleResize);
 </script>

@@ -398,10 +398,16 @@ body {
 }
 
 .summary-cards .card {
-        border: none;
-        border-radius: 8px;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
 }
+.summary-cards .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
 .summary-cards .card-title {
         color: #6c757d;
         font-size: 1rem;
@@ -480,4 +486,22 @@ body {
     background: #f8f9fa;
     border-radius: 8px;
 }
+#trendingMap {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+}
 
+.leaflet-popup-content {
+    min-width: 250px;
+    max-width: 300px;
+}
+
+.map-popup ol {
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.map-popup li {
+    margin-bottom: 0.25rem;
+}

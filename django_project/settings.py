@@ -200,3 +200,4 @@ REDIS_CONNECTION = {
     'ssl': REDIS_URL.startswith('redis'),
     'ssl_cert_reqs': None
 }
+
