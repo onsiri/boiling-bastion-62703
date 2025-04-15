@@ -29,10 +29,10 @@
                     window.location.href = '/models/future_sale/';
                 }
                 else if (productName.toLowerCase() === ('cold start prediction').toLowerCase()) {
-                    window.location.href = '/models/customer-recommendations/';
+                    window.location.href = "{% url 'ai_models:customer_recommendations' %}";
                 }
-            }); // Fixed the syntax error here
+            });
         });
     });
 </script>
-{% endblock content %}
+{% endblock content %} // Fixed the syntax error here
