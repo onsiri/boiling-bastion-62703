@@ -15,7 +15,7 @@ from django.utils import timezone
 import logging
 from .management.commands.generate_predictions import PredictionPipeline
 from celery.utils.log import get_task_logger
-
+from django.apps import apps
 logger = get_task_logger(__name__)
 
 
@@ -142,8 +142,12 @@ def process_analytics_after_upload():
     async_generate_forecast.delay()
     async_predict_future_sales.delay()
 
+
 @shared_task
 async def async_upload_object_db(model_object_name, df_json):
+    # Dynamically get the model class
+    model_class = apps.get_model(model_object_name)
+
     df = pd.read_json(df_json)
     table_name = model_class._meta.db_table
     columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
@@ -161,14 +165,19 @@ async def async_upload_object_db(model_object_name, df_json):
     ]
 
     # Batch insert using raw SQL
-    batch_size = 500  # Reduce batch size for Heroku
+    batch_size = 500
     with connection.cursor() as cursor:
         for i in range(0, len(values), batch_size):
             batch = values[i:i + batch_size]
+            # Generate placeholders for all rows in the batch
+            placeholders = ", ".join(["(%s, %s, %s, %s, %s)"] * len(batch))
             query = f"""
-                    INSERT INTO {table_name} 
-                    ({", ".join(columns)})
-                    VALUES {", ".join(["%s"] * len(batch))}
-                """
-            cursor.execute(query, batch)
-    print(f'🎉 Total records inserted successfully')
+                INSERT INTO {table_name} 
+                ({", ".join(columns)})
+                VALUES {placeholders}
+            """
+            # Flatten the batch into a single parameter list
+            params = [val for row in batch for val in row]
+            cursor.execute(query, params)
+
+    print(f'🎉 Total {len(values)} records inserted successfully')
