@@ -176,7 +176,7 @@ def async_upload_object_db(model_path, df):
         error_count += len(df) - len(valid_df)
 
         # Batch processing with memory cleanup
-        batch_size = 2000  # Adjust based on Heroku memory limits
+        batch_size = 1000  # Adjust based on Heroku memory limits
         columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
 
         with transaction.atomic():
