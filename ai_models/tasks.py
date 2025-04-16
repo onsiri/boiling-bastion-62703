@@ -21,7 +21,9 @@ from django.db import transaction, connections
 from io import StringIO
 import datetime
 import gc
+import io
 from django.utils.timezone import now
+import numpy as np
 
 logger = get_task_logger(__name__)
 
@@ -150,10 +152,11 @@ def process_analytics_after_upload():
 
 @shared_task
 def async_upload_object_db(model_path, df):
+    """Memory-safe CSV upload with PostgreSQL reserved keyword handling"""
     try:
         model = apps.get_model(model_path)
 
-        # 1. Validate and rename columns
+        # 1. Column validation and renaming
         df = df.rename(columns={'ItemDescription': 'group'})
         required_cols = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
 
@@ -161,24 +164,57 @@ def async_upload_object_db(model_path, df):
             missing = set(required_cols) - set(df.columns)
             raise ValueError(f"Missing columns: {missing}")
 
-        # 2. Clean and prepare data
-        df['ds'] = pd.to_datetime(df['ds'], errors='coerce', format='mixed')
-        df = df.dropna(subset=['ds']).copy()
-        df['ds'] = df['ds'].dt.date  # Convert to date objects
+        # 2. Clean data in chunks
+        chunksize = 10000  # Process in 10k row chunks
+        total_inserted = 0
 
-        # 3. Add created_at column
-        df['created_at'] = datetime.datetime.now()
-
-        # 4. Insert data into database using executemany
         with connection.cursor() as cursor:
-            for index, row in df.iterrows():
-                cursor.execute(f"""
-                    INSERT INTO {model._meta.db_table} (ds, "group", prediction, prediction_lower, prediction_upper, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (row['ds'], row['group'], row['prediction'], row['prediction_lower'], row['prediction_upper'], row['created_at']))
+            # 3. Stream directly to PostgreSQL using binary COPY
+            cursor.execute("SET SESSION statement_timeout = 0;")
 
-        logger.info(f' Success: {len(df)} records inserted')
+            for chunk in pd.read_csv(
+                    df.to_csv(index=False, header=True, encoding='utf-8'),
+                    chunksize=chunksize,
+                    parse_dates=['ds'],
+                    infer_datetime_format=True,
+                    dtype={'group': 'category'}
+            ):
+                # Clean chunk data
+                chunk = chunk.dropna()
+                if chunk.empty:
+                    continue
+
+                # 4. Use CSV format with proper quoting
+                csv_buffer = chunk.to_csv(
+                    index=False,
+                    header=False,
+                    encoding='utf-8',
+                    columns=required_cols,
+                    date_format='%Y-%m-%d'
+                )
+
+                # 5. Execute COPY with proper column quoting
+                copy_sql = f"""
+                    COPY {model._meta.db_table} 
+                    (ds, "group", prediction, prediction_lower, prediction_upper)
+                    FROM STDIN WITH (
+                        FORMAT CSV,
+                        DELIMITER ',',
+                        NULL '',
+                        ENCODING 'UTF8'
+                    )
+                """
+
+                cursor.copy_expert(copy_sql, io.StringIO(csv_buffer))
+                total_inserted += len(chunk)
+
+                # 6. Explicit memory cleanup
+                del chunk, csv_buffer
+                gc.collect()
+
+        logger.info(f'🔥 Success: {total_inserted} records inserted')
+        return total_inserted
 
     except Exception as e:
-        logger.error(f' Catastrophic failure: {str(e)}', exc_info=True)
+        logger.error(f'💥 Catastrophic failure: {str(e)}', exc_info=True)
         raise

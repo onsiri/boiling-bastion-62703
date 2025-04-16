@@ -222,7 +222,7 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 error_msg = f"Missing users: {', '.join(sorted(missing_users)[:5])}"
                 if len(missing_users) > 5:
                     error_msg += f"... ({len(missing_users) - 5} more)"
-                self.message_user(request, error_msg, level=messages.ERROR)
+                self.message_user(request, error_msg, level=messageså.ERROR)
 
             # Bulk create transactions
             created_count = 0

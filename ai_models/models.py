@@ -152,4 +152,5 @@ class ItemSaleForecast(models.Model):
             models.Index(fields=['group', 'ds']),
             models.Index(fields=['ds'])
         ]
-2
+        managed = False  # Only if managing DB separately
+        db_table = 'ai_models_itemsaleforecast'
