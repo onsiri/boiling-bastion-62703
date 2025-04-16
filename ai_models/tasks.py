@@ -1,5 +1,7 @@
+import csv
 from tempfile import NamedTemporaryFile
 from psycopg2.extras import execute_values
+import psycopg2
 from celery import shared_task
 from keras import Sequential
 from keras.src.layers import Embedding, LSTM
@@ -152,9 +154,12 @@ def process_analytics_after_upload():
 
 @shared_task
 def async_upload_object_db(model_path, df):
-    """Memory-safe CSV upload with PostgreSQL reserved keyword handling"""
+    """Ultra-low memory CSV streaming with proper file-like object handling"""
     try:
         model = apps.get_model(model_path)
+        table = model._meta.db_table
+        total = 0
+        chunksize = 5000  # Process in small chunks for memory safety
 
         # 1. Column validation and renaming
         df = df.rename(columns={'ItemDescription': 'group'})
@@ -164,57 +169,55 @@ def async_upload_object_db(model_path, df):
             missing = set(required_cols) - set(df.columns)
             raise ValueError(f"Missing columns: {missing}")
 
-        # 2. Clean data in chunks
-        chunksize = 10000  # Process in 10k row chunks
-        total_inserted = 0
+        # 2. Process in memory-safe chunks
+        with connection.connection as conn:  # Raw psycopg2 connection
+            with conn.cursor() as cursor:
+                # 3. Prepare CSV buffer
+                buffer = io.StringIO()
 
-        with connection.cursor() as cursor:
-            # 3. Stream directly to PostgreSQL using binary COPY
-            cursor.execute("SET SESSION statement_timeout = 0;")
+                # 4. Process DataFrame in chunks
+                for i in range(0, len(df), chunksize):
+                    chunk = df.iloc[i:i + chunksize].copy()
 
-            for chunk in pd.read_csv(
-                    df.to_csv(index=False, header=True, encoding='utf-8'),
-                    chunksize=chunksize,
-                    parse_dates=['ds'],
-                    infer_datetime_format=True,
-                    dtype={'group': 'category'}
-            ):
-                # Clean chunk data
-                chunk = chunk.dropna()
-                if chunk.empty:
-                    continue
+                    # Clean and convert dates
+                    chunk['ds'] = pd.to_datetime(chunk['ds'], errors='coerce').dt.strftime('%Y-%m-%d')
+                    chunk = chunk.dropna(subset=['ds'])
 
-                # 4. Use CSV format with proper quoting
-                csv_buffer = chunk.to_csv(
-                    index=False,
-                    header=False,
-                    encoding='utf-8',
-                    columns=required_cols,
-                    date_format='%Y-%m-%d'
-                )
+                    # Add created_at column
+                    chunk['created_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-                # 5. Execute COPY with proper column quoting
-                copy_sql = f"""
-                    COPY {model._meta.db_table} 
-                    (ds, "group", prediction, prediction_lower, prediction_upper)
-                    FROM STDIN WITH (
-                        FORMAT CSV,
-                        DELIMITER ',',
-                        NULL '',
-                        ENCODING 'UTF8'
+                    # Write to CSV buffer
+                    chunk[required_cols + ['created_at']].to_csv(
+                        buffer,
+                        index=False,
+                        header=False,
+                        mode='a',
+                        escapechar='\\',
+                        quoting=csv.QUOTE_MINIMAL
                     )
-                """
 
-                cursor.copy_expert(copy_sql, io.StringIO(csv_buffer))
-                total_inserted += len(chunk)
+                    # 5. Stream to PostgreSQL
+                    buffer.seek(0)
+                    cursor.copy_expert(
+                        f"""COPY {table} (ds, "group", prediction, prediction_lower, prediction_upper, created_at)
+                           FROM STDIN WITH (FORMAT CSV, DELIMITER ',')""",
+                        buffer
+                    )
+                    total += len(chunk)
 
-                # 6. Explicit memory cleanup
-                del chunk, csv_buffer
-                gc.collect()
+                    # 6. Memory cleanup
+                    buffer.truncate(0)
+                    buffer.seek(0)
+                    del chunk
+                    gc.collect()
 
-        logger.info(f'🔥 Success: {total_inserted} records inserted')
-        return total_inserted
+                conn.commit()
+
+        logger.info(f' Success: {total} records inserted')
+        return total
 
     except Exception as e:
-        logger.error(f'💥 Catastrophic failure: {str(e)}', exc_info=True)
+        logger.error(f' Catastrophic failure: {str(e)}', exc_info=True)
+        if 'conn' in locals():
+            conn.rollback()
         raise
