@@ -1,5 +1,5 @@
-import json
-
+from tempfile import NamedTemporaryFile
+from psycopg2.extras import execute_values
 from celery import shared_task
 from keras import Sequential
 from keras.src.layers import Embedding, LSTM
@@ -149,65 +149,51 @@ def process_analytics_after_upload():
 def async_upload_object_db(model_path, df):
     try:
         model = apps.get_model(model_path)
-        total_inserted = 0
-        error_count = 0
 
-        # Optimize DataFrame memory usage upfront
-        df = df.rename(columns={'ItemDescription': 'group'})
-        df = df[['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']].copy()
+        # 1. Column Renaming and Validation
+        column_map = {'ItemDescription': 'group'}
+        df = df.rename(columns=column_map)
 
-        # Convert data types to reduce memory
-        df['group'] = df['group'].astype('category')
-        for col in ['prediction', 'prediction_lower', 'prediction_upper']:
-            df[col] = pd.to_numeric(df[col], errors='coerce', downcast='float')
+        required_columns = ['ds', 'group', 'prediction',
+                            'prediction_lower', 'prediction_upper']
 
-        # Convert dates with multiple format handling
-        df['ds'] = pd.to_datetime(df['ds'], errors='coerce', format='mixed').dt.date
+        if not set(required_columns).issubset(df.columns):
+            missing = set(required_columns) - set(df.columns)
+            raise ValueError(f"Missing required columns: {missing}")
 
-        # Remove invalid records after conversions
-        valid_mask = (
-                df['ds'].notna() &
-                df['group'].notna() &
-                df['prediction'].notna() &
-                df['prediction_lower'].notna() &
-                df['prediction_upper'].notna()
-        )
-        valid_df = df[valid_mask].copy()
-        error_count += len(df) - len(valid_df)
+        # 2. Data Type Conversion
+        df['ds'] = pd.to_datetime(df['ds'], errors='coerce', format='mixed')
+        df = df.dropna(subset=['ds'])  # Remove rows with invalid dates
 
-        # Batch processing with memory cleanup
-        batch_size = 500  # Adjust based on Heroku memory limits
-        columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
+        # 3. CSV Chunk Processing
+        with NamedTemporaryFile(mode='w+', suffix='.csv') as tmpfile:
+            # Write DataFrame to CSV in chunks
+            df.to_csv(tmpfile.name, index=False, columns=required_columns,
+                      chunksize=100000, encoding='utf-8')
 
-        with transaction.atomic():
-            for i in range(0, len(valid_df), batch_size):
-                batch = valid_df.iloc[i:i + batch_size][columns]
+            # 4. PostgreSQL COPY Command
+            with connection.cursor() as cursor:
+                tmpfile.seek(0)  # Reset file pointer
 
-                # Convert category codes back to strings for database
-                batch['group'] = batch['group'].cat.categories[batch['group'].cat.codes]
+                copy_sql = f"""
+                    COPY {model._meta.db_table} 
+                    (ds, "group", prediction, prediction_lower, prediction_upper)
+                    FROM STDIN WITH (
+                        FORMAT CSV,
+                        HEADER TRUE,
+                        NULL '',
+                        DELIMITER ','
+                    )
+                """
 
-                # Batch insert with explicit memory management
-                instances = [
-                    model(**{col: row[col] for col in columns})
-                    for _, row in batch.iterrows()
-                ]
+                cursor.copy_expert(copy_sql, tmpfile)
 
-                model.objects.bulk_create(
-                    instances,
-                    batch_size=batch_size,
-                    ignore_conflicts=True
-                )
+            logger.info(f'🔥 Success: {len(df)} records inserted via COPY')
 
-                total_inserted += len(instances)
-
-                # Explicit memory cleanup
-                del instances, batch
-                gc.collect()
-
-        print(f'🔥 Success: {total_inserted} records inserted')
-        if error_count > 0:
-            print(f'⚠️ Skipped {error_count} invalid records')
+        # 5. Cleanup
+        del df
+        gc.collect()
 
     except Exception as e:
-        print(f'💥 Catastrophic failure: {str(e)}')
+        logger.error(f'💥 Catastrophic failure: {str(e)}', exc_info=True)
         raise
