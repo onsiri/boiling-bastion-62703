@@ -17,10 +17,13 @@ from .management.commands.generate_predictions import PredictionPipeline
 from celery.utils.log import get_task_logger
 from django.apps import apps
 from django.core.management.color import no_style
-logger = get_task_logger(__name__)
 from django.db import transaction, connections
 from io import StringIO
+import datetime
 import gc
+from django.utils.timezone import now
+
+logger = get_task_logger(__name__)
 
 @shared_task(bind=True)
 def generate_predictions_task(self):
@@ -150,34 +153,34 @@ def async_upload_object_db(model_path, df):
     try:
         model = apps.get_model(model_path)
 
-        # 1. Column Renaming and Validation
-        column_map = {'ItemDescription': 'group'}
-        df = df.rename(columns=column_map)
+        # 1. Validate and rename columns
+        df = df.rename(columns={'ItemDescription': 'group'})
+        required_cols = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
 
-        required_columns = ['ds', 'group', 'prediction',
-                            'prediction_lower', 'prediction_upper']
+        if not set(required_cols).issubset(df.columns):
+            missing = set(required_cols) - set(df.columns)
+            raise ValueError(f"Missing columns: {missing}")
 
-        if not set(required_columns).issubset(df.columns):
-            missing = set(required_columns) - set(df.columns)
-            raise ValueError(f"Missing required columns: {missing}")
-
-        # 2. Data Type Conversion
+        # 2. Clean and prepare data
         df['ds'] = pd.to_datetime(df['ds'], errors='coerce', format='mixed')
-        df = df.dropna(subset=['ds'])  # Remove rows with invalid dates
+        df = df.dropna(subset=['ds']).copy()
+        df['ds'] = df['ds'].dt.date  # Convert to date objects
 
-        # 3. CSV Chunk Processing
+        # 3. Add created_at column
+        df['created_at'] = datetime.datetime.now()
+
+        # 4. CSV chunk processing
         with NamedTemporaryFile(mode='w+', suffix='.csv') as tmpfile:
-            # Write DataFrame to CSV in chunks
-            df.to_csv(tmpfile.name, index=False, columns=required_columns,
-                      chunksize=100000, encoding='utf-8')
+            # Write CSV with correct headers
+            df[required_cols + ['created_at']].to_csv(tmpfile.name, index=False, header=True, encoding='utf-8')
 
-            # 4. PostgreSQL COPY Command
+            # 5. PostgreSQL COPY command
             with connection.cursor() as cursor:
-                tmpfile.seek(0)  # Reset file pointer
+                tmpfile.seek(0)
 
                 copy_sql = f"""
                     COPY {model._meta.db_table} 
-                    (ds, "group", prediction, prediction_lower, prediction_upper)
+                    (ds, "group", prediction, prediction_lower, prediction_upper, created_at)
                     FROM STDIN WITH (
                         FORMAT CSV,
                         HEADER TRUE,
@@ -188,12 +191,12 @@ def async_upload_object_db(model_path, df):
 
                 cursor.copy_expert(copy_sql, tmpfile)
 
-            logger.info(f'🔥 Success: {len(df)} records inserted via COPY')
+            logger.info(f' Success: {len(df)} records inserted')
 
-        # 5. Cleanup
+        # 6. Cleanup
         del df
         gc.collect()
 
     except Exception as e:
-        logger.error(f'💥 Catastrophic failure: {str(e)}', exc_info=True)
+        logger.error(f' Catastrophic failure: {str(e)}', exc_info=True)
         raise
