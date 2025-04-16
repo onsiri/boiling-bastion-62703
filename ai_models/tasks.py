@@ -18,6 +18,7 @@ from django.core.management.color import no_style
 logger = get_task_logger(__name__)
 from django.db import transaction, connections
 from io import StringIO
+import gc
 
 @shared_task(bind=True)
 def generate_predictions_task(self):
@@ -145,36 +146,38 @@ def process_analytics_after_upload():
 @shared_task
 def async_upload_object_db(model_path, df_json):
     try:
-        model = apps.get_model(model_path)  # Must be "app_label.ModelName"
+        model = apps.get_model(model_path)
         df = pd.read_json(df_json)
 
-        # Verify exact column names
-        df = df.rename(columns={
-            'ItemDescription': 'group'  # If DF uses different column name
-        })
+        # Column rename and type optimizations
+        df = df.rename(columns={'ItemDescription': 'group'})
+        df['group'] = df['group'].astype('category')
+        for col in ['prediction', 'prediction_lower', 'prediction_upper']:
+            df[col] = pd.to_numeric(df[col], downcast='float')
+        df['ds'] = pd.to_datetime(df['ds']).dt.date
 
-        # Prepare data for bulk insertion
-        columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
-        df = df[columns].copy()
-        df['ds'] = pd.to_datetime(df['ds']).dt.date  # Convert to date objects
-
-        # Reset DB sequence
-        conn = connections['default']
-        sequence_sql = conn.ops.sequence_reset_sql(no_style(), [model])
-        with conn.cursor() as cursor:
-            for sql in sequence_sql:
-                cursor.execute(sql)
-
-        # Batch insert directly using low-level SQL
+        # Batch insertion with index-based access
+        batch_size = 1000
         with transaction.atomic():
-            batch_size = 10000  # Adjusted for large datasets
             for i in range(0, len(df), batch_size):
                 batch = df.iloc[i:i + batch_size]
+                instances = [
+                    model(
+                        ds=row[0],  # Column order: ['ds', 'group', 'prediction', ...]
+                        group=row[4],
+                        prediction=row[1],
+                        prediction_lower=row[2],
+                        prediction_upper=row[3]
+                    )
+                    for row in batch.itertuples(index=False, name=None)
+                ]
                 model.objects.bulk_create(
-                    [model(**row) for _, row in batch.iterrows()],
+                    instances,
                     batch_size=batch_size,
                     ignore_conflicts=True
                 )
+                del instances, batch
+                gc.collect()
 
         print(f'🔥 Success: {len(df)} records inserted')
 
