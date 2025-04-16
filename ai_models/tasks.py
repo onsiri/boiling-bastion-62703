@@ -1,3 +1,5 @@
+import json
+
 from celery import shared_task
 from keras import Sequential
 from keras.src.layers import Embedding, LSTM
@@ -144,42 +146,67 @@ def process_analytics_after_upload():
 
 
 @shared_task
-def async_upload_object_db(model_path, df_json):
+def async_upload_object_db(model_path, df):
     try:
         model = apps.get_model(model_path)
-        df = pd.read_json(df_json)
+        total_inserted = 0
+        error_count = 0
 
-        # Column rename and type optimizations
+        # Optimize DataFrame memory usage upfront
         df = df.rename(columns={'ItemDescription': 'group'})
+        df = df[['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']].copy()
+
+        # Convert data types to reduce memory
         df['group'] = df['group'].astype('category')
         for col in ['prediction', 'prediction_lower', 'prediction_upper']:
-            df[col] = pd.to_numeric(df[col], downcast='float')
-        df['ds'] = pd.to_datetime(df['ds']).dt.date
+            df[col] = pd.to_numeric(df[col], errors='coerce', downcast='float')
 
-        # Batch insertion with index-based access
-        batch_size = 1000
+        # Convert dates with multiple format handling
+        df['ds'] = pd.to_datetime(df['ds'], errors='coerce', format='mixed').dt.date
+
+        # Remove invalid records after conversions
+        valid_mask = (
+                df['ds'].notna() &
+                df['group'].notna() &
+                df['prediction'].notna() &
+                df['prediction_lower'].notna() &
+                df['prediction_upper'].notna()
+        )
+        valid_df = df[valid_mask].copy()
+        error_count += len(df) - len(valid_df)
+
+        # Batch processing with memory cleanup
+        batch_size = 2000  # Adjust based on Heroku memory limits
+        columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
+
         with transaction.atomic():
-            for i in range(0, len(df), batch_size):
-                batch = df.iloc[i:i + batch_size]
+            for i in range(0, len(valid_df), batch_size):
+                batch = valid_df.iloc[i:i + batch_size][columns]
+
+                # Convert category codes back to strings for database
+                batch['group'] = batch['group'].cat.categories[batch['group'].cat.codes]
+
+                # Batch insert with explicit memory management
                 instances = [
-                    model(
-                        ds=row[0],  # Column order: ['ds', 'group', 'prediction', ...]
-                        group=row[4],
-                        prediction=row[1],
-                        prediction_lower=row[2],
-                        prediction_upper=row[3]
-                    )
-                    for row in batch.itertuples(index=False, name=None)
+                    model(**{col: row[col] for col in columns})
+                    for _, row in batch.iterrows()
                 ]
+
                 model.objects.bulk_create(
                     instances,
                     batch_size=batch_size,
                     ignore_conflicts=True
                 )
+
+                total_inserted += len(instances)
+
+                # Explicit memory cleanup
                 del instances, batch
                 gc.collect()
 
-        print(f'🔥 Success: {len(df)} records inserted')
+        print(f'🔥 Success: {total_inserted} records inserted')
+        if error_count > 0:
+            print(f'⚠️ Skipped {error_count} invalid records')
 
     except Exception as e:
         print(f'💥 Catastrophic failure: {str(e)}')

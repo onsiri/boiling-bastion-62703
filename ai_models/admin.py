@@ -255,7 +255,7 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
                 #upload_object_db('ItemSaleForecast', item_forecasts_df)
                 print(len(item_forecasts_df))
-                async_upload_object_db('ai_models.ItemSaleForecast', item_forecasts_df.to_json())
+                async_upload_object_db('ai_models.ItemSaleForecast', item_forecasts_df)
                 print("Upload started in the background!")
             except Exception as e:
                 analytics_errors.append(f"Forecast error: {str(e)}")
