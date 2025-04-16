@@ -1,11 +1,4 @@
-from django.db.models import Max
-from django.utils import timezone
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from prophet import Prophet
-import pandas as pd
 from django.db import models
-from datetime import datetime, timedelta
 from django.core.validators import MinValueValidator, MaxValueValidator  # Add this import
 
 class UploadBatch(models.Model):
@@ -147,14 +140,16 @@ class CountrySaleForecast(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class ItemSaleForecast(models.Model):
+    ds = models.DateField()
+    group = models.CharField(max_length=200)  # Stores ItemDescription
+    prediction = models.FloatField()
+    prediction_lower = models.FloatField()
+    prediction_upper = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         indexes = [
             models.Index(fields=['group', 'ds']),
             models.Index(fields=['ds'])
         ]
-    group = models.CharField(max_length=200)  # ItemDescription
-    ds = models.DateField()
-    prediction = models.FloatField()
-    prediction_lower = models.FloatField()
-    prediction_upper = models.FloatField()
-    created_at = models.DateTimeField(auto_now_add=True)
+2

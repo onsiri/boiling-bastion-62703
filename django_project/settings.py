@@ -173,10 +173,10 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes timeout for tasks
 CELERY_WORKER_STATE_DB = '/tmp/celery_worker_state.db'
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Using Redis
+CELERY_BROKER_URL = 'redis://redis:6379/0'  # Using Redis
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
 # Parse the Redis URL
 url = urlparse(REDIS_URL)
@@ -184,7 +184,7 @@ url = urlparse(REDIS_URL)
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",  # Use Docker service name if applicable
+        "LOCATION": REDIS_URL + "/1",  # Use Docker service name if applicable
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "IGNORE_EXCEPTIONS": True,  # Prevents crashes if Redis is down

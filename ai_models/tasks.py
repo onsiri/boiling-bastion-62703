@@ -5,8 +5,6 @@ from keras.src.utils import pad_sequences
 from sklearn.preprocessing import LabelEncoder
 from ai_models.models import Transaction, NextItemPrediction, Item
 import numpy as np
-from django.utils import timezone
-from django.db import transaction
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense
 from django.db import connection
@@ -16,9 +14,10 @@ import logging
 from .management.commands.generate_predictions import PredictionPipeline
 from celery.utils.log import get_task_logger
 from django.apps import apps
+from django.core.management.color import no_style
 logger = get_task_logger(__name__)
-
-
+from django.db import transaction, connections
+from io import StringIO
 
 @shared_task(bind=True)
 def generate_predictions_task(self):
@@ -139,45 +138,46 @@ def async_predict_future_sales():
 
 @shared_task
 def process_analytics_after_upload():
-    async_generate_forecast.delay()
+    #async_generate_forecast.delay()
     async_predict_future_sales.delay()
 
 
 @shared_task
-async def async_upload_object_db(model_object_name, df_json):
-    # Dynamically get the model class
-    model_class = apps.get_model(model_object_name)
+def async_upload_object_db(model_path, df_json):
+    try:
+        model = apps.get_model(model_path)  # Must be "app_label.ModelName"
+        df = pd.read_json(df_json)
 
-    df = pd.read_json(df_json)
-    table_name = model_class._meta.db_table
-    columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
+        # Verify exact column names
+        df = df.rename(columns={
+            'ItemDescription': 'group'  # If DF uses different column name
+        })
 
-    # Prepare tuples for all rows
-    values = [
-        (
-            pd.to_datetime(row.ds).date().isoformat(),
-            row.country if model_class.__name__ == 'CountrySaleForecast' else row.ItemDescription,
-            float(row.prediction),
-            float(row.prediction_lower),
-            float(row.prediction_upper)
-        )
-        for row in df.itertuples()
-    ]
+        # Prepare data for bulk insertion
+        columns = ['ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper']
+        df = df[columns].copy()
+        df['ds'] = pd.to_datetime(df['ds']).dt.date  # Convert to date objects
 
-    # Batch insert using raw SQL
-    batch_size = 500
-    with connection.cursor() as cursor:
-        for i in range(0, len(values), batch_size):
-            batch = values[i:i + batch_size]
-            # Generate placeholders for all rows in the batch
-            placeholders = ", ".join(["(%s, %s, %s, %s, %s)"] * len(batch))
-            query = f"""
-                INSERT INTO {table_name} 
-                ({", ".join(columns)})
-                VALUES {placeholders}
-            """
-            # Flatten the batch into a single parameter list
-            params = [val for row in batch for val in row]
-            cursor.execute(query, params)
+        # Reset DB sequence
+        conn = connections['default']
+        sequence_sql = conn.ops.sequence_reset_sql(no_style(), [model])
+        with conn.cursor() as cursor:
+            for sql in sequence_sql:
+                cursor.execute(sql)
 
-    print(f'🎉 Total {len(values)} records inserted successfully')
+        # Batch insert directly using low-level SQL
+        with transaction.atomic():
+            batch_size = 5000  # Adjusted for large datasets
+            for i in range(0, len(df), batch_size):
+                batch = df.iloc[i:i + batch_size]
+                model.objects.bulk_create(
+                    [model(**row) for _, row in batch.iterrows()],
+                    batch_size=batch_size,
+                    ignore_conflicts=True
+                )
+
+        print(f'🔥 Success: {len(df)} records inserted')
+
+    except Exception as e:
+        print(f'💥 Catastrophic failure: {str(e)}')
+        raise

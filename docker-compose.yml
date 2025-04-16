@@ -30,6 +30,10 @@ services:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]
 
+
+
+
+
 volumes:
   postgres_data:
   redis_data:  # Add Redis volume for persistence
