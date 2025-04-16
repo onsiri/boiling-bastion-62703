@@ -254,7 +254,6 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 upload_object_db('NextItemPrediction', nextItem_forecasts_df)
                 item_forecasts_df = import_forecasts_from_s3('item_forecasts.csv')
                 #upload_object_db('ItemSaleForecast', item_forecasts_df)
-                item_forecasts_df = item_forecasts_df.head(100000)
                 print(len(item_forecasts_df))
                 async_upload_object_db('ai_models.ItemSaleForecast', item_forecasts_df.to_json())
                 print("Upload started in the background!")

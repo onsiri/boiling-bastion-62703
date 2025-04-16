@@ -167,7 +167,7 @@ def async_upload_object_db(model_path, df_json):
 
         # Batch insert directly using low-level SQL
         with transaction.atomic():
-            batch_size = 5000  # Adjusted for large datasets
+            batch_size = 10000  # Adjusted for large datasets
             for i in range(0, len(df), batch_size):
                 batch = df.iloc[i:i + batch_size]
                 model.objects.bulk_create(
