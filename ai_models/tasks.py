@@ -169,33 +169,15 @@ def async_upload_object_db(model_path, df):
         # 3. Add created_at column
         df['created_at'] = datetime.datetime.now()
 
-        # 4. CSV chunk processing
-        with NamedTemporaryFile(mode='w+', suffix='.csv') as tmpfile:
-            # Write CSV with correct headers
-            df[required_cols + ['created_at']].to_csv(tmpfile.name, index=False, header=True, encoding='utf-8')
+        # 4. Insert data into database using executemany
+        with connection.cursor() as cursor:
+            for index, row in df.iterrows():
+                cursor.execute(f"""
+                    INSERT INTO {model._meta.db_table} (ds, "group", prediction, prediction_lower, prediction_upper, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (row['ds'], row['group'], row['prediction'], row['prediction_lower'], row['prediction_upper'], row['created_at']))
 
-            # 5. PostgreSQL COPY command
-            with connection.cursor() as cursor:
-                tmpfile.seek(0)
-
-                copy_sql = f"""
-                    COPY {model._meta.db_table} 
-                    (ds, "group", prediction, prediction_lower, prediction_upper, created_at)
-                    FROM STDIN WITH (
-                        FORMAT CSV,
-                        HEADER TRUE,
-                        NULL '',
-                        DELIMITER ','
-                    )
-                """
-
-                cursor.copy_expert(copy_sql, tmpfile)
-
-            logger.info(f' Success: {len(df)} records inserted')
-
-        # 6. Cleanup
-        del df
-        gc.collect()
+        logger.info(f' Success: {len(df)} records inserted')
 
     except Exception as e:
         logger.error(f' Catastrophic failure: {str(e)}', exc_info=True)
