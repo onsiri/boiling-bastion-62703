@@ -175,7 +175,8 @@ CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes timeout for tasks
 CELERY_WORKER_STATE_DB = '/tmp/celery_worker_state.db'
 CELERY_BROKER_URL = 'redis://redis:6379/0'  # Using Redis
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 300_000  # KB
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
 # Parse the Redis URL
