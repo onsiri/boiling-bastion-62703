@@ -18,6 +18,7 @@ from .tasks import generate_predictions_task
 from celery.result import AsyncResult
 import logging
 logger = logging.getLogger(__name__)
+from django.db.models import Min, Max
 
 def top_30_sale_forecast(request):
     # Calculate date range (tomorrow + 30 days)
@@ -129,9 +130,9 @@ def future_sale_prediction(request):
     # Numeric filters with validation
     try:
         if filters['min_probability']:
-            base_query = base_query.filter(Probability__gte=float(filters['min_probability']))
+            base_query = base_query.filter(Probability__gte=float(filters['min_probability'])/100)
         if filters['max_probability']:
-            base_query = base_query.filter(Probability__lte=float(filters['max_probability']))
+            base_query = base_query.filter(Probability__lte=float(filters['max_probability'])/100)
         if filters['min_cost']:
             base_query = base_query.filter(PredictedItemCost__gte=float(filters['min_cost']))
         if filters['max_cost']:
@@ -146,11 +147,10 @@ def future_sale_prediction(request):
         base_query = base_query.filter(PredictedAt__lte=filters['end_date'])
 
     # CSV Export Handling
-    # CSV Export Handling (updated)
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv')
         today = timezone.now().date()
-        response['Content-Disposition'] = f'attachment; filename="future_sales_{today}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="Customer_Purchase_Probability_{today}.csv"'
 
         writer = csv.writer(response)
         writer.writerow([
@@ -217,12 +217,23 @@ def future_sale_prediction(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
 
+    date_range = NextItemPrediction.objects.aggregate(
+        min_ds=Min('PredictedAt'),
+        max_ds=Max('PredictedAt')
+    )
+
+    # Format dates for HTML input
+    min_ds = date_range['min_ds'].strftime('%Y-%m-%d') if date_range['min_ds'] else ''
+    max_ds = date_range['max_ds'].strftime('%Y-%m-%d') if date_range['max_ds'] else ''
+
     context = {
         'page_obj': page_obj,
         'sort_by': sort_by,
         'sort_order': sort_order,
         'filters': filters,
-        'request': request
+        'request': request,
+        'min_ds': min_ds,  # Add these
+        'max_ds': max_ds   # to context
     }
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
@@ -303,7 +314,7 @@ def customer_recommendations(request):
     if 'export' in request.GET:
         queryset = base_query[:1000]  # Get top 1000 filtered records
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="customer_recommendations.csv"'
+        response['Content-Disposition'] = 'attachment; filename="New_Customer_Recommendations .csv"'
 
         writer = csv.writer(response)
         writer.writerow([

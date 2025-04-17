@@ -505,3 +505,17 @@ body {
 .map-popup li {
     margin-bottom: 0.25rem;
 }
+.date-placeholder[type="text"] {
+    color: #666; /* Placeholder-like color */
+}
+
+/* For browsers that support date inputs */
+.date-placeholder[type="date"]:invalid::-webkit-datetime-edit {
+    color: transparent;
+}
+
+.date-placeholder[type="date"]:invalid:before {
+    content: attr(placeholder);
+    color: #666;
+    margin-right: 0.5em;
+}

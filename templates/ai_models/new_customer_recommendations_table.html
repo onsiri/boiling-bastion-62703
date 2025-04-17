@@ -3,14 +3,17 @@
         <div class="table-responsive">
             {% if page_obj %}
             <table class="table table-hover">
-                <thead class="table-light">
+               <thead class="table-light">
                     <tr>
-                        <th><a href="?sort_by=user__UserId" class="rec-sort-header">Customer ID</a></th>
-                        <th><a href="?sort_by=item_code" class="rec-sort-header">Item Code</a></th>
-                        <th>Type</th>
-                        <th><a href="?sort_by=confidence_score" class="rec-sort-header">Confidence</a></th>
-                        <th>Generated</th>
-                        <th>Expires</th>
+                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId" class="rec-sort-header">Customer ID</a></th>
+                        <th>Item Code</th>
+                        <th>Description</th>
+                        <th>Unit Cost</th>
+                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type" class="rec-sort-header">Type</a></th>
+                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score" class="rec-sort-header">Probability</a></th>
+                        <!-- Add sorting for dates -->
+                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}generation_date" class="rec-sort-header">Generated</a></th>
+                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}expiry_date" class="rec-sort-header">Expires</a></th>
                     </tr>
                 </thead>
                 <tbody>

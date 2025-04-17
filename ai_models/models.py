@@ -88,7 +88,7 @@ class NewCustomerRecommendation(models.Model):
         related_name='recommendations',
         db_column='UserId'
     )
-    item_code = models.CharField(max_length=100)
+    item_code = models.CharField(max_length=1000)
     recommendation_type = models.CharField(
         max_length=2,
         choices=RecommendationType.choices,

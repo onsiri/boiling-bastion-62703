@@ -22,10 +22,10 @@
                 var productName = this.getAttribute('data-product-name').trim();
                 console.log('Clicked product:', productName);
                 // Normalize the comparison
-                if (productName.toLowerCase() === ('sale forecast').toLowerCase()){
+                if (productName.toLowerCase() === ('Sales Forecast').toLowerCase()){
                     window.location.href = '/models/top-30-sale-forecast/';
                 }
-                else if (productName.toLowerCase() === ('Personalized Predictions').toLowerCase()) {
+                else if (productName.toLowerCase() === ('Customer Recommendation').toLowerCase()) {
                     window.location.href = '/models/future_sale/';
                 }
                 else if (productName.toLowerCase() === ('cold start prediction').toLowerCase()) {
