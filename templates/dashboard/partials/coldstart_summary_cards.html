@@ -1,4 +1,5 @@
 <div class="summary-cards mb-4">
+    {% load humanize %}
     <div class="row justify-content-center">
         <!-- Total Recommendations -->
         <div class="col-md-3 col-sm-6 mb-3">
@@ -9,7 +10,7 @@
                         <div class="display-4 mr-3">
                             {% if total_recommendations is not None %}
                                 <span class="text-primary">
-                                    {{ total_recommendations }}
+                                    {{ total_recommendations|intcomma }}
                                 </span>
                             {% else %}
                                 <span class="text-muted">N/A</span>
@@ -63,11 +64,11 @@
                     <h5 class="card-title mb-3">Recommendation Status</h5>
                     <div class="d-flex justify-content-around align-items-center flex-grow-1">
                         <div class="text-center">
-                            <div class="h2 text-success mb-1">{{ active_recommendations }}</div>
+                            <div class="h2 text-success mb-1">{{ active_recommendations|intcomma }}</div>
                             <small class="text-muted">Active</small>
                         </div>
                         <div class="text-center">
-                            <div class="h2 text-danger mb-1">{{ expired_recommendations }}</div>
+                            <div class="h2 text-danger mb-1">{{ expired_recommendations|intcomma }}</div>
                             <small class="text-muted">Expired</small>
                         </div>
                     </div>
@@ -90,7 +91,7 @@
                         <div class="display-4 mr-3">
                             {% if most_recommended_count %}
                                 <span class="text-info">
-                                    {{ most_recommended_count }}
+                                    {{ most_recommended_count|intcomma }}
                                 </span>
                             {% else %}
                                 <span class="text-muted">N/A</span>

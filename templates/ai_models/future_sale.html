@@ -39,23 +39,25 @@
                         <input type="number" step="0.01" class="form-control" name="max_cost"
                                value="{{ filters.max_cost }}" placeholder="Max Cost">
                     </div>
-                    <div class="col-md-3">
+                   <div class="col-md-3">
                         <input type="text"
-                               class="form-control date-placeholder"
+                               class="form-control date-input"
                                name="start_date"
                                placeholder="Start Date"
-                               onfocus="this.type='date'"
-                               onblur="if(!this.value) this.type='text'"
-                               {% if filters.start_date %}value="{{ filters.start_date }}"{% endif %}>
+                               {% if filters.start_date %}value="{{ filters.start_date }}"{% endif %}
+                               data-placeholder="Start Date"
+                               onfocus="handleDateInputFocus(this)"
+                               onblur="handleDateInputBlur(this)">
                     </div>
                     <div class="col-md-3">
                         <input type="text"
-                               class="form-control date-placeholder"
+                               class="form-control date-input"
                                name="end_date"
                                placeholder="End Date"
-                               onfocus="this.type='date'"
-                               onblur="if(!this.value) this.type='text'"
-                               {% if filters.start_date %}value="{{ filters.end_date }}"{% endif %}>
+                               {% if filters.end_date %}value="{{ filters.end_date }}"{% endif %}
+                               data-placeholder="End Date"
+                               onfocus="handleDateInputFocus(this)"
+                               onblur="handleDateInputBlur(this)">
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">Apply</button>
@@ -124,5 +126,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+function handleDateInputFocus(input) {
+    input.type = 'date';
+    input.removeAttribute('placeholder');
+    // Set min/max dates if needed
+    input.min = '{{ min_ds }}';
+    input.max = '{{ max_ds }}';
+}
+
+function handleDateInputBlur(input) {
+    if (!input.value) {
+        input.type = 'text';
+        input.placeholder = input.dataset.placeholder;
+    }
+}
+
+// Initialize inputs on page load
+document.querySelectorAll('.date-input').forEach(input => {
+    if (!input.value) {
+        input.type = 'text';
+        input.placeholder = input.dataset.placeholder;
+    } else {
+        input.type = 'date';
+    }
+});
 </script>
+
+
 {% endblock %}

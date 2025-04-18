@@ -19,6 +19,7 @@ from celery.result import AsyncResult
 import logging
 logger = logging.getLogger(__name__)
 from django.db.models import Min, Max
+from django.utils.dateparse import parse_date
 
 def top_30_sale_forecast(request):
     # Calculate date range (tomorrow + 30 days)
@@ -141,10 +142,20 @@ def future_sale_prediction(request):
         pass  # Handle invalid number formats silently
 
     # Date filters
-    if filters['start_date']:
-        base_query = base_query.filter(PredictedAt__gte=filters['start_date'])
-    if filters['end_date']:
-        base_query = base_query.filter(PredictedAt__lte=filters['end_date'])
+        # Date filters with validation
+        start_date = None
+        end_date = None
+
+        if filters['start_date']:
+            start_date = parse_date(filters['start_date'])  # Converts 'yyyy-mm-dd' string to date object
+        if filters['end_date']:
+            end_date = parse_date(filters['end_date'])
+
+        # Apply date filters to queryset
+        if start_date:
+            base_query = base_query.filter(PredictedAt__date__gte=start_date)
+        if end_date:
+            base_query = base_query.filter(PredictedAt__date__lte=end_date)
 
     # CSV Export Handling
     if request.GET.get('export') == 'csv':

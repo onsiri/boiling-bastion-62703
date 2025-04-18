@@ -528,8 +528,11 @@ def get_new_customer_rec_context(request):
         item_info.update({
             'code': item_parts[0].strip() if len(item_parts) >= 1 else most_recommended['item_code'],
             'name': item_parts[1].strip() if len(item_parts) >= 2 else "Invalid format",
-            'count': most_recommended['count']
+            # Explicitly cast count to integer (safety check)
+            'count': int(most_recommended['count'])  # <--- Fix here
         })
+    else:
+        item_info['count'] = 0  # Already int, but ensures consistency
 
     # Geospatial Data
     country_stats = (

@@ -1,4 +1,5 @@
 <div class="summary-cards mb-4">
+     {% load humanize %}
         <div class="row">
             <!-- Total Predicted Revenue Card -->
             <div class="col-md-3 mb-3">
@@ -8,7 +9,7 @@
                         <div class="d-flex align-items-center">
                             <div class="display-4 mr-3">
                                     <span class="text-success">
-                                ${{ total_predicted_revenue|floatformat:0|default:"N/A" }}
+                                ${{ total_predicted_revenue|floatformat:0|intcomma|default:"N/A" }}
                             </span>
                             </div>
                             <div>
@@ -80,7 +81,7 @@
                         <div class="d-flex align-items-center">
                             <div class="display-4 mr-3">
                                 <span class="text-info">
-                                    {{ unique_items_count|default:"N/A" }}
+                                    {{ unique_items_count|intcomma|default:"N/A" }}
                                 </span>
                             </div>
                             <div>
