@@ -1,8 +1,9 @@
 <!-- templates/ai_models/top_30_sale_forecast.html -->
 {% extends "base.html" %}
+{% load humanize %}
 {% block content %}
 <head>
-    <title>Top 30 Sale Forecast</title>
+    <title>Top 30 Sales Forecast</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         .sort-indicator {
@@ -31,7 +32,7 @@
 <body>
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>30 Days Sale Forecast</h1>
+            <h1>30 Days Sales Forecast</h1>
             <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
                class="btn btn-success">
                 <i class="bi bi-download"></i> Export to CSV
@@ -54,11 +55,11 @@
                         <tbody>
                             {% for item in page_obj %}
                             <tr>
-                                <td>{{ item.ds }}</td>
-                                <td>${{ item.prediction }}</td>
-                                <td>${{ item.prediction_lower }}</td>
-                                <td>${{ item.prediction_upper }}</td>
-                                <td>{{ item.uploaded_at }}</td>
+                                <td>{{ item.ds|date:"Y-m-d }}</td>
+                                <td>${{ item.prediction|intcomma }}</td>
+                                <td>${{ item.prediction_lower|intcomma }}</td>
+                                <td>${{ item.prediction_upper|intcomma }}</td>
+                                <td>{{ item.uploaded_at|date:"Y-m-d H:i" }}</td>
                             </tr>
                             {% empty %}
                             <tr>

@@ -39,7 +39,7 @@ def top_30_sale_forecast(request):
     # Handle CSV export
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="next_30_days_forecast_{today}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast{today}.csv"'
 
         writer = csv.writer(response)
         writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
@@ -280,9 +280,9 @@ def customer_recommendations(request):
     # Numeric filters
     try:
         if filters['min_confidence']:
-            base_query = base_query.filter(confidence_score__gte=float(filters['min_confidence']))
+            base_query = base_query.filter(confidence_score__gte=float(filters['min_confidence']) * 100)
         if filters['max_confidence']:
-            base_query = base_query.filter(confidence_score__lte=float(filters['max_confidence']))
+            base_query = base_query.filter(confidence_score__lte=float(filters['max_confidence']) * 100)
     except ValueError:
         pass
 

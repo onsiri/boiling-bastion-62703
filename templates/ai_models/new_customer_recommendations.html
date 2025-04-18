@@ -78,10 +78,11 @@
                 <tr>
                     <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId">User ID {% if sort_field == 'user__UserId' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
                     <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}item_code">Item Code {% if sort_field == 'item_code' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type">Type {% if sort_field == 'recommendation_type' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score">Confidence {% if sort_field == 'confidence_score' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-                    <th>Generated Date</th>
-                    <th>Expiry Date</th>
+                    <th>Item Description</th>
+                    <th>Item Cost</th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score">Probability {% if sort_field == 'confidence_score' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}generation_date">Generated Date {% if sort_field == 'generation_date' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+                    <th><a class="sort-header" href="?sort_by={% if sort_order == 'asc' %}-{% endif %}expiry_date">Expiry Date {% if sort_field == 'expiry_date' %}{% if sort_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
                 </tr>
             </thead>
 
@@ -91,9 +92,8 @@
                     <td>{{ rec.user.UserId }}</td>
                     <td>{{ rec.item_code|split_item_code:'code' }}</td>
                     <td>{{ rec.item_code|split_item_code:'description' }}</td>
-                    <td>\${{ rec.item_code|split_item_code:'cost'|floatformat:2 }}</td>
-                    <td>{{ rec.get_recommendation_type_display }}</td>
-                    <td>{{ rec.confidence_score|mul:100|floatformat:2 }}</td>
+                    <td>${{ rec.item_code|split_item_code:'cost'|floatformat:2 }}</td>
+                    <td>{{ rec.confidence_score|mul:100|floatformat:0 }}%</td>
                     <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
                     <td>
                         {% if rec.expiry_date %}
