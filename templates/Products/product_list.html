@@ -19,18 +19,20 @@
 
         productCards.forEach(function(card) {
             card.addEventListener('click', function() {
-                var productName = this.getAttribute('data-product-name').trim();
-                console.log('Clicked product:', productName);
-                // Normalize the comparison
-                if (productName.toLowerCase() === ('30 days sales forecast').toLowerCase()){
-                    window.location.href = '/models/top-30-sale-forecast/';
-                }
-                else if (productName.toLowerCase() === ('Customer Recommendation').toLowerCase()) {
-                    window.location.href = '/models/future_sale/';
-                }
-                else if (productName.toLowerCase() === ('new customer prediction').toLowerCase()) {
-                    window.location.href = "{% url 'ai_models:customer_recommendations' %}";
-                }
+                var productName = this.getAttribute('data-product-name')
+                .replace(/\s+/g, ' ') // Replace multiple spaces with one
+                .trim()               // Remove leading/trailing spaces
+                .toLowerCase();       // Convert to lowercase
+
+            console.log('Clicked product:', productName);
+
+            if (productName === '30 days sales forecast') {
+                window.location.href = '/models/top-30-sale-forecast/';
+            } else if (productName === 'customer recommendation') {
+                window.location.href = '/models/future_sale/';
+            } else if (productName === 'new customer prediction') {
+                window.location.href = "{% url 'ai_models:customer_recommendations' %}";
+            }
             });
         });
     });
