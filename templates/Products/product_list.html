@@ -22,17 +22,17 @@
                 var productName = this.getAttribute('data-product-name').trim();
                 console.log('Clicked product:', productName);
                 // Normalize the comparison
-                if (productName.toLowerCase() === ('30 Days Sales Forecast').toLowerCase()){
+                if (productName.toLowerCase() === ('30 days sales forecast').toLowerCase()){
                     window.location.href = '/models/top-30-sale-forecast/';
                 }
                 else if (productName.toLowerCase() === ('Customer Recommendation').toLowerCase()) {
                     window.location.href = '/models/future_sale/';
                 }
-                else if (productName.toLowerCase() === ('30 Days Sales Forecast').toLowerCase()) {
+                else if (productName.toLowerCase() === ('new customer prediction').toLowerCase()) {
                     window.location.href = "{% url 'ai_models:customer_recommendations' %}";
                 }
             });
         });
     });
 </script>
-{% endblock content %} // Fixed the syntax error here
+{% endblock content %}
