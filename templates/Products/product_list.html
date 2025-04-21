@@ -27,9 +27,9 @@
             console.log('Clicked product:', productName);
 
             if (productName === '30 days sales forecast') {
-                window.location.href = '/models/top-30-sale-forecast/';
+                window.location.href = "{% url 'ai_models:top_30_sale_forecast' %}";
             } else if (productName === 'customer recommendation') {
-                window.location.href = '/models/future_sale/';
+                window.location.href = "{% url 'ai_models:future_sale' %}";
             } else if (productName === 'new customer prediction') {
                 window.location.href = "{% url 'ai_models:customer_recommendations' %}";
             }
