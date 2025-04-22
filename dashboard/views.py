@@ -89,12 +89,26 @@ def get_sales_forecast_context(request):
 
     # Base querysets with conditional filtering
     def get_base_queryset(model, group_field, selected):
-        qs = model.objects.all()
-        if selected != 'All':
-            qs = qs.filter(**{group_field: selected})
-        return qs.select_related('group').only('ds', 'prediction', 'group')
+        queryset = model.objects.all()
 
-    country_data = get_base_queryset(CountrySaleForecast, 'group', country_selected)
+        # Special case: Exclude multiple countries for "All" selection
+        if model == CountrySaleForecast and selected == "All":
+            excluded_groups = [
+                "Brazil", "Canada", "Malta", "Bahrain",
+                "Saudi Arabia", "Lithuania", "Greece",
+                "Poland", "Iceland", "Lebanon",
+                "European Community"
+            ]
+            queryset = queryset.exclude(group__in=excluded_groups)
+
+        if selected != "All":
+            queryset = queryset.filter(**{group_field: selected})
+
+        return queryset.values("ds").annotate(
+            prediction=Sum("prediction")
+        ).order_by("ds")
+
+    country_data = get_base_queryset(CountrySaleForecast, "group", country_selected)
     item_data = get_base_queryset(ItemSaleForecast, 'group', item_selected)
 
     # Common annotation for total predictions
@@ -107,10 +121,6 @@ def get_sales_forecast_context(request):
                 .values('total')
             )
         ).order_by('ds')[:365]
-
-    # Batch processing for chart data
-    country_data = add_total_annotation(country_data)
-    item_data = add_total_annotation(item_data)
 
     # Chart generation helper
     def create_figure(data, chart_type, title):
@@ -325,10 +335,6 @@ def sales_forecast_view(request):
 def sales_forecast_partial(request):
     context = get_combined_context(request)
     return render(request, 'dashboard/partials/main_content.html', context)
-
-
-
-
 
 
 def generate_chart_data(chart_type, filters):
