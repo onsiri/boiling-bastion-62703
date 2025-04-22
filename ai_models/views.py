@@ -102,7 +102,7 @@ def top_30_sale_forecast(request):
         'date_range': f"{start_date} to {end_date}"
     }
 
-    return render(request, 'ai_models/top_30_sale_forecast.html', context)
+    return render(request, 'ai_models/../backup/top_30_sale_forecast.html', context)
 
 
 def future_sale_prediction(request):

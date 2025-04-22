@@ -16,18 +16,16 @@
     <div class="sidebar-header">LondNet</div>
     <ul class="sidebar-menu">
         <li><a href="{% url 'home' %}">Home</a></li>
-        <li><a href="{% url 'about' %}">About</a></li>
         <li><a href="{% url 'product_list' %}">Our Models</a></li>
         <li class="dropdown">
-            Dashboard <span class="arrow">›</span>
+            Dashboard and Reports <span class="arrow">›</span>
             <ul class="dropdown-menu">
                 <li><a href="{% url 'personalization' %}" class="dropdown-item">Customer Recommendation</a></li>
                 <li><a href="{% url 'new_customer_rec' %}" class="dropdown-item">New Customer Prediction</a></li>
-                <li><a href="{% url 'sales_forecast' %}" class="dropdown-item">Yearly Sales Forecast</a></li>
+                <li><a href="{% url 'sales_forecast' %}" class="dropdown-item">Sales Forecast</a></li>
             </ul>
         </li>
         <li><a href="#">FAQ</a></li>
-        <li><a href="#">Settings</a></li>
         <li><a href="{% url 'contact_us' %}">Contact Us</a></li>
         <li><a href="{% url 'admin:index' %}">Admin</a></li>
     </ul>

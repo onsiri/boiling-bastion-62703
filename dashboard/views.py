@@ -12,12 +12,12 @@ from django_project import settings
 from django.shortcuts import render
 from plotly.offline import plot
 import plotly.graph_objects as pgo
-from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction, Item, NewCustomerRecommendation, CustomerDetail
+from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction, sale_forecast, NewCustomerRecommendation, CustomerDetail
 from django.db.models import Sum, Max, Q, Subquery, OuterRef, F, ExpressionWrapper, DecimalField, Avg, Count
 from django.db.models.functions import TruncMonth
 from django.views.decorators.cache import cache_page
 import pandas as pd
-
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 def export_to_s3(request):
     # Serialize data
@@ -291,15 +291,45 @@ def get_sales_forecast_context(request):
         'executive_summary': executive_summary,
         'top_country_contribution': top_country_contribution
     }
+
+
+def get_combined_context(request):
+    # Existing dashboard context
+    dashboard_context = get_sales_forecast_context(request)
+
+    # 30-day forecast context
+    sort_by = request.GET.get('sort_by', 'ds')
+    sort_order = request.GET.get('sort_order', 'desc')
+    forecasts = sale_forecast.objects.all().order_by(f'{"-" if sort_order == "desc" else ""}{sort_by}')
+
+    paginator = Paginator(forecasts, 30)
+    page_number = request.GET.get('page', 1)
+
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    return {
+        **dashboard_context,
+        'page_obj': page_obj,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+    }
 @cache_page(60 * 15, cache="default")
 def sales_forecast_view(request):
-    context = get_sales_forecast_context(request)
+    context = get_combined_context(request)
     return render(request, 'dashboard/sales_forecast.html', context)
-# Cache partials for 5 minutes
+
 @cache_page(60 * 5)
 def sales_forecast_partial(request):
-    context = get_sales_forecast_context(request)
+    context = get_combined_context(request)
     return render(request, 'dashboard/partials/main_content.html', context)
+
+
+
+
+
 
 def generate_chart_data(chart_type, filters):
     """Generate data for async chart requests"""
@@ -596,3 +626,6 @@ def get_new_customer_rec_context(request):
 def new_customer_rec_view(request):
     context = get_new_customer_rec_context(request)
     return render(request, 'dashboard/new_customer_rec.html', context)
+
+
+
