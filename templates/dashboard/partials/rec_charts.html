@@ -15,7 +15,7 @@
     <div class="col-md-12 mb-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title">Item Affinity</h5>
+                <h5 class="card-title">Item Correlations</h5>
                 <div id="itemAffinityHeatmap" style="height: 500px;"></div>
                 <div id="itemAffinityMessage" class="text-muted small mt-2"></div>
             </div>
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         Plotly.newPlot(heatmapDiv, clusterData, clusterLayout, config);
-        messageDiv.textContent = `Displaying \${y.length} users and \${x.length} items`;
+        messageDiv.textContent = "Displaying " +y.length + " users and " + x.length +" items";
     } catch (error) {
         console.error('Cluster Heatmap Error:', error);
         document.getElementById('clusterHeatmap').style.display = 'none';
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         Plotly.newPlot(affinityDiv, affinityData, affinityLayout, config);
-        messageDiv.textContent = `Displaying affinity between \${x.length} items`;
+        messageDiv.textContent = "Displaying correlation between "  + x.length + " items";
     } catch (error) {
         console.error('Affinity Heatmap Error:', error);
         document.getElementById('itemAffinityHeatmap').style.display = 'none';

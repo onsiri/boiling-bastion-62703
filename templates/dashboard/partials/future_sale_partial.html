@@ -13,9 +13,8 @@
     <!-- Filter Section -->
     <div class="card mb-4">
         <div class="card-body">
-            <form id="filter-form"
-                  hx-get="{% url 'ai_models:future_sale_prediction' %}"
-                  hx-target="#future-sale-table-container"
+            <form hx-get="{% url 'ai_models:future_sale_prediction' %}"
+                  hx-target="#future-sale-table-section"
                   hx-swap="innerHTML"
                   class="form-inline">
                 <div class="row g-3">
@@ -72,9 +71,9 @@
                         <a href="{% url 'ai_models:future_sale_prediction' %}"
                            class="btn btn-outline-secondary w-100"
                            hx-get="{% url 'ai_models:future_sale_prediction' %}"
-                           hx-target="#future-sale-table-container"
+                           hx-target="#future-sale-table-section"
                            hx-swap="innerHTML">
-                            Clear
+                            Reset
                         </a>
                     </div>
                 </div>
@@ -82,8 +81,8 @@
         </div>
     </div>
 
-    <!-- Table Container -->
-    <div id="future-sale-table-container">
+    <!-- Table Container with separate target -->
+    <div id="future-sale-table-section">
         {% include "ai_models/future_sale_table.html" %}
     </div>
 </div>

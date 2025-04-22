@@ -78,17 +78,19 @@
             });
             </script>
         </div>
-
         <!-- Purchase Probability Tab -->
         <div class="tab-pane fade" id="purchase-probability">
             <div id="future-sale-content"
-                 hx-get="{% url 'ai_models:future_sale_prediction' %}"
+                 hx-get="{% url 'ai_models:future_sale_prediction' %}?main-container=1"
                  hx-trigger="load"
                  hx-swap="innerHTML">
-                <!-- Loading indicator optional -->
-                <div class="text-center">Loading...</div>
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
             </div>
-</div>
+        </div>
     </div>
 
     <!-- Required Scripts -->

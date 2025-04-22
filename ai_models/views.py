@@ -234,13 +234,12 @@ def future_sale_prediction(request):
         'max_ds': max_ds   # to context
     }
 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or \
-            'personalization' in request.META.get('HTTP_REFERER', ''):
-        # Return the partial template WITH FILTERS
-        return render(request, 'dashboard/partials/future_sale_partial.html', context)
+    if request.headers.get('HX-Request') == 'true' and 'main-container' not in request.GET:
+        template = "ai_models/future_sale_table.html"  # Table only
     else:
-        # Return full page for direct access
-        return render(request, 'ai_models/future_sale.html', context)
+        template = "dashboard/partials/future_sale_partial.html"  # Full content
+
+    return render(request, template, context)
 @csrf_exempt
 def generate_recommendations(request):
     if request.method == 'POST':
