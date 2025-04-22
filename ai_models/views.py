@@ -40,7 +40,7 @@ def top_30_sale_forecast(request):
     # Handle CSV export
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast{today}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast_{today}.csv"'
 
         writer = csv.writer(response)
         writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
@@ -102,7 +102,7 @@ def top_30_sale_forecast(request):
         'date_range': f"{start_date} to {end_date}"
     }
 
-    return render(request, 'ai_models/../backup/top_30_sale_forecast.html', context)
+    return render(request, 'ai_models/top_30_sale_forecast.html', context)
 
 
 def future_sale_prediction(request):
@@ -141,59 +141,44 @@ def future_sale_prediction(request):
     except ValueError:
         pass  # Handle invalid number formats silently
 
-    # Date filters
-        # Date filters with validation
-        start_date = None
-        end_date = None
-
-        if filters['start_date']:
-            start_date = parse_date(filters['start_date'])  # Converts 'yyyy-mm-dd' string to date object
-        if filters['end_date']:
-            end_date = parse_date(filters['end_date'])
-
-        # Apply date filters to queryset
-        if start_date:
-            base_query = base_query.filter(PredictedAt__date__gte=start_date)
-        if end_date:
-            base_query = base_query.filter(PredictedAt__date__lte=end_date)
-
     # CSV Export Handling
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv')
         today = timezone.now().date()
+        response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="Customer_Purchase_Probability_{today}.csv"'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
 
-        writer = csv.writer(response)
+        writer = csv.writer(response)  # Critical missing line
         writer.writerow([
             'User ID', 'Prediction Date', 'Probability (%)',
             'Item Description', 'Item Cost', 'Prediction Timestamp'
         ])
 
-        # Get sorting parameters from request
-        sort_by = request.GET.get('sort_by', 'Probability')
-        sort_order = request.GET.get('sort_order', 'desc')
-
-        # Validate sort parameters
-        valid_sort_fields = ['UserId', 'PredictedAt', 'Probability',
-                             'PredictedItemDescription', 'PredictedItemCost']
-        if sort_by not in valid_sort_fields:
-            sort_by = 'Probability'
-            sort_order = 'desc'  # Ensure sort_order is set even if sort_by was invalid
-
-        # Always create order_by expression after validation
-        order_prefix = '-' if sort_order == 'desc' else ''
-        order_by = f'{order_prefix}{sort_by}'
-
         try:
+            # Sorting configuration for HTML view
+            valid_sort_fields = [...]
+            sort_by = request.GET.get('sort_by', 'Probability')
+            sort_order = request.GET.get('sort_order', 'desc')
+            # Validate sorting parameters
+            if sort_by not in valid_sort_fields:
+                sort_by = 'Probability'
+                sort_order = 'desc'
+            # Create order_by expression
+            order_prefix = '-' if sort_order == 'desc' else ''
+            order_by = f'{order_prefix}{sort_by}'
             ordered = base_query.order_by(order_by, '-Probability')
             for item in ordered:
+                predicted_date = item.PredictedAt.strftime('%Y-%m-%d') if item.PredictedAt else 'N/A'
+                timestamp = item.PredictedAt.strftime('%Y-%m-%d %H:%M') if item.PredictedAt else 'N/A'
+
                 writer.writerow([
-                    item.UserId,
-                    item.PredictedAt.strftime('%Y-%m-%d'),
-                    f"{item.Probability * 100:.2f}",
-                    item.PredictedItemDescription,
-                    f"\${item.PredictedItemCost:.2f}" if item.PredictedItemCost else '',
-                    item.PredictedAt.strftime('%Y-%m-%d %H:%M')
+                    item.UserId or 'N/A',
+                    predicted_date,
+                    f"{item.Probability * 100:.2f}" if item.Probability else '0.00',
+                    item.PredictedItemDescription or 'N/A',
+                    f"${item.PredictedItemCost:.2f}" if item.PredictedItemCost is not None else '\$0.00',
+                    timestamp
                 ])
             return response
         except Exception as e:
@@ -264,6 +249,7 @@ def generate_recommendations(request):
 
 
 def customer_recommendations(request):
+    today = timezone.now().date()
     # Filter parameters
     filters = {
         'user_filter': request.GET.get('user_filter', '').strip(),
@@ -325,8 +311,7 @@ def customer_recommendations(request):
     if 'export' in request.GET:
         queryset = base_query[:1000]  # Get top 1000 filtered records
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="New_Customer_Recommendations_{today}_.csv"'
-
+        response['Content-Disposition'] = f'attachment; filename="New_Customer_Recommendations_{today}.csv"'
         writer = csv.writer(response)
         writer.writerow([
             'Customer ID', 'Item Code', 'Type',

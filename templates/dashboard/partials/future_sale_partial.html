@@ -2,11 +2,12 @@
     <!-- Header and Export Button -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Customer Purchase Probability</h2>
-        <button
-            onclick="window.location.href='{% url 'ai_models:future_sale_prediction' %}?export=true{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}'"
-            class="btn btn-sm btn-primary">
-            <i class="fas fa-download me-2"></i>Export CSV
-        </button>
+        <a href="{% url 'ai_models:future_sale_prediction' %}?export=csv{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+           class="btn btn-sm btn-primary"
+           hx-boost="false"
+           download>
+          <i class="fas fa-download me-2"></i>Export CSV
+        </a>
     </div>
 
      <!-- Filter Section -->
