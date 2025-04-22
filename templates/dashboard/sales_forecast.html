@@ -6,24 +6,24 @@
     <!-- Tabs Navigation -->
     <ul class="nav nav-tabs mb-4" id="dashboardTabs">
         <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#top30-forecast">Sales Forecast</a>
+            <a class="nav-link active" data-bs-toggle="tab" href="#dashboard-content">Analytic Dashboard</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#dashboard-content">Analytic Dashboard</a>
+            <a class="nav-link" data-bs-toggle="tab" href="#top30-forecast">Sales Forecast</a>
         </li>
     </ul>
 
     <!-- Tab Content -->
     <div class="tab-content">
-        <!-- Top 30 Forecast Tab -->
-        <div class="tab-pane fade" id="top30-forecast">
-            {% include "dashboard/partials/top_30_sale_forecast_partial.html" %}
-        </div>
          <!-- Dashboard Tab -->
         <div class="tab-pane fade show active" id="dashboard-content">
             <div id="main-content">
                 {% include "dashboard/partials/main_content.html" %}
             </div>
+        </div>
+         <!-- Top 30 Forecast Tab -->
+        <div class="tab-pane fade" id="top30-forecast">
+            {% include "dashboard/partials/top_30_sale_forecast_partial.html" %}
         </div>
     </div>
 

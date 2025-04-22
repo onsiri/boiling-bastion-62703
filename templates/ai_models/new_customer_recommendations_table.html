@@ -1,95 +1,165 @@
+{% load custom_filters %}
+
 <div id="recommendation-table" class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Customer Recommendations</h5>
+        <button
+            onclick="window.location.href='{% url 'ai_models:customer_recommendations' %}?export=true{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}'"
+            class="btn btn-sm btn-primary">
+            <i class="fas fa-download me-2"></i>Export CSV
+        </button>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="card-body border-bottom">
+        <form hx-get="{% url 'ai_models:customer_recommendations' %}"
+              hx-target="#recommendations-table-content"
+              hx-swap="innerHTML"
+              class="row g-3">
+
+            <!-- Customer ID Filter -->
+            <div class="col-12 col-md-3">
+                <input type="text" name="user_filter" value="{{ filters.user_filter }}"
+                       class="form-control form-control-sm" placeholder="Customer ID">
+            </div>
+
+            <!-- Item Code Filter -->
+            <div class="col-12 col-md-3">
+                <input type="text" name="item_filter" value="{{ filters.item_filter }}"
+                       class="form-control form-control-sm" placeholder="Item Code/Description">
+            </div>
+
+            <!-- Recommendation Type -->
+            <div class="col-12 col-md-2">
+                <select name="rec_type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                    {% for value, label in rec_types %}
+                        <option value="{{ value }}" {% if filters.rec_type == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Confidence Range -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <input type="number" name="min_confidence" value="{{ filters.min_confidence }}"
+                           class="form-control" placeholder="Min Probability%" step="1" min="0" max="100">
+                    <span class="input-group-text">-</span>
+                    <input type="number" name="max_confidence" value="{{ filters.max_confidence }}"
+                           class="form-control" placeholder="Max Probability%" step="1" min="0" max="100">
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="col-12 col-md-4 d-flex gap-2">  <!-- Changed from col-md-6 to col-md-4 -->
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-0">
+                    <i class="fas fa-filter me-1"></i>Filter  <!-- Shortened text and adjusted margin -->
+                </button>
+                <a href="{% url 'ai_models:customer_recommendations' %}"
+                   class="btn btn-sm btn-outline-secondary flex-grow-0"
+                   hx-get="{% url 'ai_models:customer_recommendations' %}"
+                   hx-target="#recommendations-table-content"
+                   hx-swap="innerHTML">
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
     <div class="card-body">
         <div class="table-responsive">
             {% if page_obj %}
-            <table class="table table-hover">
-               <thead class="table-light">
-                    <tr>
-                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId" class="rec-sort-header">Customer ID</a></th>
-                        <th>Item Code</th>
-                        <th>Description</th>
-                        <th>Unit Cost</th>
-                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type" class="rec-sort-header">Type</a></th>
-                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score" class="rec-sort-header">Probability</a></th>
-                        <!-- Add sorting for dates -->
-                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}generation_date" class="rec-sort-header">Generated</a></th>
-                        <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}expiry_date" class="rec-sort-header">Expires</a></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for rec in page_obj %}
-                    <tr>
-                        <td>{{ rec.user.UserId }}</td>
-                        <td>{{ rec.item_code }}</td>
-                        <td>{{ rec.get_recommendation_type_display }}</td>
-                        <td>{{ rec.confidence_score|floatformat:2 }}</td>
-                        <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
-                        <td>
-                            {% if rec.expiry_date %}
-                                {{ rec.expiry_date|date:"Y-m-d H:i" }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center">No recommendations found</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId" class="rec-sort-header">Customer ID</a></th>
+                            <th>Item Code</th>
+                            <th>Description</th>
+                            <th>Unit Cost</th>
+                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type" class="rec-sort-header">Type</a></th>
+                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score" class="rec-sort-header">Probability</a></th>
+                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}generation_date" class="rec-sort-header">Generated</a></th>
+                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}expiry_date" class="rec-sort-header">Expires</a></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in page_obj %}
+                        <tr>
+                            <td>{{ rec.user.UserId }}</td>
+                            <td>{{ rec.item_code|split_item_code:'code' }}</td>
+                            <td>{{ rec.item_code|split_item_code:'description' }}</td>
+                            <td>${{ rec.item_code|split_item_code:'cost'|floatformat:2 }}</td>
+                            <td>{{ rec.get_recommendation_type_display }}</td>
+                            <td>{{ rec.confidence_score|mul:100|floatformat:0 }}%</td>
+                            <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if rec.expiry_date %}
+                                    {{ rec.expiry_date|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center">No recommendations found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
 
-            <!-- Pagination -->
-            <div class="pagination mt-4">
-                <ul class="pagination-list d-flex flex-wrap gap-2 list-unstyled">
-                    {% if page_obj.has_previous %}
-                        <li>
-                            <a href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                               class="page-link">&laquo;</a>
-                        </li>
-                        <li>
-                            <a href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                               class="page-link">Prev</a>
-                        </li>
-                    {% endif %}
-
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
+                <!-- Pagination -->
+                <div class="pagination mt-4">
+                    <ul class="pagination-list d-flex flex-wrap gap-2 list-unstyled">
+                        {% if page_obj.has_previous %}
                             <li>
-                                <span class="page-link active">{{ num }}</span>
+                                <a href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">&laquo;</a>
                             </li>
-                        {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
                             <li>
-                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                                   class="page-link">{{ num }}</a>
-                            </li>
-                        {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                            <li>
-                                <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                                   class="page-link">{{ num }}</a>
-                            </li>
-                        {% elif num == page_obj.number|add:-3 or num == page_obj.number|add:3 %}
-                            <li class="disabled">
-                                <span class="page-link">...</span>
+                                <a href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">Prev</a>
                             </li>
                         {% endif %}
-                    {% endfor %}
 
-                    {% if page_obj.has_next %}
-                        <li>
-                            <a href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                               class="page-link">Next</a>
-                        </li>
-                        <li>
-                            <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
-                               class="page-link">&raquo;</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li>
+                                    <span class="page-link active">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                                <li>
+                                    <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                       class="page-link">{{ num }}</a>
+                                </li>
+                            {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                                <li>
+                                    <a href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                       class="page-link">{{ num }}</a>
+                                </li>
+                            {% elif num == page_obj.number|add:-3 or num == page_obj.number|add:3 %}
+                                <li class="disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li>
+                                <a href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">Next</a>
+                            </li>
+                            <li>
+                                <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                                   class="page-link">&raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
             {% else %}
-            <div class="alert alert-warning">No recommendations available. Try generating some first!</div>
+                <div class="alert alert-warning">No recommendations available. Try generating some first!</div>
             {% endif %}
         </div>
     </div>

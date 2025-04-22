@@ -247,13 +247,13 @@ def future_sale_prediction(request):
         'max_ds': max_ds   # to context
     }
 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'ai_models/future_sale_table.html', context)
-
-    return render(request, 'ai_models/future_sale.html', context)
-
-
-
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or \
+            'personalization' in request.META.get('HTTP_REFERER', ''):
+        # Return the partial template WITH FILTERS
+        return render(request, 'dashboard/partials/future_sale_partial.html', context)
+    else:
+        # Return full page for direct access
+        return render(request, 'ai_models/future_sale.html', context)
 @csrf_exempt
 def generate_recommendations(request):
     if request.method == 'POST':
@@ -325,7 +325,7 @@ def customer_recommendations(request):
     if 'export' in request.GET:
         queryset = base_query[:1000]  # Get top 1000 filtered records
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="New_Customer_Recommendations .csv"'
+        response['Content-Disposition'] = 'attachment; filename="New_Customer_Recommendations_{today}_.csv"'
 
         writer = csv.writer(response)
         writer.writerow([
@@ -358,7 +358,7 @@ def customer_recommendations(request):
         'request': request
     }
 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+    if request.headers.get('HX-Request') == 'true':
         return render(request, 'ai_models/new_customer_recommendations_table.html', context)
 
     return render(request, 'ai_models/new_customer_recommendations.html', context)

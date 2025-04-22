@@ -25,11 +25,12 @@
         }
     </style>
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>30 Days Sales Forecast</h1>
-        <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
-           class="btn btn-success">
-            <i class="bi bi-download"></i> Export to CSV
-        </a>
+        <h1>Sales Forecast</h1>
+        <button
+            onclick="window.location.href='{% url 'ai_models:top_30_sale_forecast' %}?export=true{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}'"
+            class="btn btn-sm btn-primary">
+            <i class="fas fa-download me-2"></i>Export CSV
+        </button>
     </div>
 
     <div class="card shadow-sm">
@@ -38,7 +39,7 @@
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>DS <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+                            <th>DS <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}asc{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction <a href="?sort_by=prediction&sort_order={% if sort_by == 'prediction' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction Lower <a href="?sort_by=prediction_lower&sort_order={% if sort_by == 'prediction_lower' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_lower' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction Upper <a href="?sort_by=prediction_upper&sort_order={% if sort_by == 'prediction_upper' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_upper' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>

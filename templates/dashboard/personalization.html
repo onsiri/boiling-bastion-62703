@@ -1,68 +1,163 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h2>Customer Recommendation Dashboard</h2>
+    <h2>Customer Recommendation</h2>
 
-    <!-- Enable HTMX scripts -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            htmx.config.allowScripts = true;
-        });
-    </script>
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="personalizationTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#recommendation-dashboard">Analytic Dashboard</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#purchase-probability">Customer Purchase Probability</a>
+        </li>
+    </ul>
 
-    <!-- Main content container (identical structure to sales_forecast.html) -->
-    <div id="main-content">
-        {% include "dashboard/partials/rec_main_content.html" %}
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Recommendation Dashboard Tab -->
+        <div class="tab-pane fade show active" id="recommendation-dashboard">
+            <!-- Enable HTMX scripts -->
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    htmx.config.allowScripts = true;
+                });
+            </script>
+
+            <!-- Main content container -->
+            <div id="main-content">
+                {% include "dashboard/partials/rec_main_content.html" %}
+            </div>
+
+            <!-- Plotly library -->
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+            <!-- Chart initialization script -->
+            <script>
+            // Initialize charts
+            function initCharts() {
+                ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        Plotly.newPlot(element, element.data, element.layout);
+                    }
+                });
+            }
+
+            // Auto-resize handler
+            function initResize(containerId) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                const observer = new ResizeObserver(() => {
+                    Plotly.Plots.resize(container);
+                });
+
+                observer.observe(container);
+            }
+
+            // Initial load
+            document.addEventListener('DOMContentLoaded', function() {
+                initCharts();
+                ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
+            });
+
+            // HTMX content swap handler
+            document.addEventListener('htmx:afterSwap', function() {
+                setTimeout(() => {
+                    initCharts();
+                    ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
+                }, 50);
+            });
+
+            // Window resize handler
+            window.addEventListener('resize', function() {
+                ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
+                    Plotly.Plots.resize(document.getElementById(id));
+                });
+            });
+            </script>
+        </div>
+
+        <!-- Purchase Probability Tab -->
+        <div class="tab-pane fade" id="purchase-probability">
+            <div id="future-sale-content"
+                 hx-get="{% url 'ai_models:future_sale_prediction' %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <!-- Loading indicator optional -->
+                <div class="text-center">Loading...</div>
+            </div>
+</div>
     </div>
 
-    <!-- Plotly library -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Required Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Chart initialization script (same pattern as sales_forecast) -->
+    <!-- Future Sale Scripts -->
     <script>
-    // Initialize charts - same structure as working sales_forecast.html
-    function initCharts() {
-        // Initialize both heatmaps
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                // Force redraw to fix layout issues
-                Plotly.newPlot(element, element.data, element.layout);
+    // Initialize tab-specific scripts when tab is shown
+    document.getElementById('personalizationTabs').addEventListener('shown.bs.tab', function(event) {
+        if (event.target.getAttribute('href') === '#purchase-probability') {
+            // Reinitialize date inputs
+            document.querySelectorAll('.date-input').forEach(input => {
+                if (!input.value) {
+                    input.type = 'text';
+                    input.placeholder = input.dataset.placeholder;
+                } else {
+                    input.type = 'date';
+                }
+            });
+
+            // Update sorting and pagination links
+            document.querySelectorAll('.sort-header, .page-link').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href) {
+                    const params = new URLSearchParams(href.split('?')[1]);
+                    const currentParams = new URLSearchParams(window.location.search);
+
+                    currentParams.forEach((value, key) => {
+                        if (key !== 'page' && !params.has(key)) {
+                            params.set(key, value);
+                        }
+                    });
+
+                    link.setAttribute('href', `?\${params.toString()}`);
+                }
+            });
+        }
+    });
+    </script>
+    <!-- personalization.html (add this script block at the bottom) -->
+<script>
+// Date Input Handlers
+function handleDateInputFocus(input) {
+    input.type = 'date';
+    input.removeAttribute('placeholder');
+    input.min = '{{ min_ds }}';
+    input.max = '{{ max_ds }}';
+}
+
+function handleDateInputBlur(input) {
+    if (!input.value) {
+        input.type = 'text';
+        input.placeholder = input.dataset.placeholder;
+    }
+}
+
+// Initialize when tab is shown
+document.getElementById('personalizationTabs').addEventListener('shown.bs.tab', function(e) {
+    if (e.target.getAttribute('href') === '#purchase-probability') {
+        document.querySelectorAll('.date-input').forEach(input => {
+            if (!input.value) {
+                input.type = 'text';
+                input.placeholder = input.dataset.placeholder;
+            } else {
+                input.type = 'date';
             }
         });
     }
-
-    // Auto-resize handler
-    function initResize(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const observer = new ResizeObserver(() => {
-            Plotly.Plots.resize(container);
-        });
-
-        observer.observe(container);
-    }
-
-    // Initial load
-    document.addEventListener('DOMContentLoaded', function() {
-        initCharts();
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
-    });
-
-    // HTMX content swap handler
-    document.addEventListener('htmx:afterSwap', function() {
-        setTimeout(() => {
-            initCharts();
-            ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(initResize);
-        }, 50);
-    });
-
-    // Window resize handler
-    window.addEventListener('resize', function() {
-        ['clusterHeatmap', 'itemAffinityHeatmap'].forEach(id => {
-            Plotly.Plots.resize(document.getElementById(id));
-        });
-    });
-    </script>
+});
+</script>
 {% endblock %}

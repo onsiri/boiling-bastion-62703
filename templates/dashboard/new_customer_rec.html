@@ -4,22 +4,54 @@
 {% block content %}
     <h2>New Customer Prediction</h2>
 
-    <!-- Enable HTMX scripts -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            htmx.config.allowScripts = true;
-        });
-    </script>
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="recommendationTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#analytics-dashboard">Analytic Dashboard</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#recommendations-table">New Customer Recommendations</a>
+        </li>
+    </ul>
 
-    <!-- Main content container -->
-    <div id="main-content">
-        {% include "dashboard/partials/coldstart_main_content.html" %}
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Analytics Dashboard Tab -->
+        <div class="tab-pane fade show active" id="analytics-dashboard">
+            <!-- Existing content here -->
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    htmx.config.allowScripts = true;
+                });
+            </script>
+
+            <div id="main-content">
+                {% include "dashboard/partials/coldstart_main_content.html" %}
+            </div>
+
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+            <script>
+            // Existing chart scripts...
+            </script>
+        </div>
+
+        <!-- Recommendations Table Tab -->
+        <div class="tab-pane fade" id="recommendations-table">
+            <div id="recommendations-table-content"
+                 hx-get="{% url 'ai_models:customer_recommendations' %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="text-center">Loading...</div>
+            </div>
+        </div>
     </div>
 
-    <!-- Plotly library -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Include necessary scripts like Bootstrap, jQuery, etc. -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Chart initialization script -->
+    <!-- Additional scripts for handling tab-specific behaviors -->
     <script>
     // Initialize charts
     function initCharts() {
