@@ -41,6 +41,8 @@ def top_30_sale_forecast(request):
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast_{today}.csv"'
+        response['X-Content-Type-Options'] = 'nosniff'  # Add this
+        response['Cache-Control'] = 'no-cache'  # Add this
 
         writer = csv.writer(response)
         writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
@@ -53,11 +55,11 @@ def top_30_sale_forecast(request):
             queryset = base_query.order_by(f'{order_prefix}{sort_by}')
             for item in queryset:
                 writer.writerow([
-                    item.ds,  # Already a date object
+                    item.ds.strftime('%Y-%m-%d'),  # Explicitly format date
                     max(0, item.prediction),
                     max(0, item.prediction_lower),
                     max(0, item.prediction_upper),
-                    item.uploaded_at
+                    item.uploaded_at.strftime('%Y-%m-%d %H:%M')  # Format datetime
                 ])
             return response
         except Exception as e:

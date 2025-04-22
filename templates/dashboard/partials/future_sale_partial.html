@@ -10,10 +10,14 @@
         </a>
     </div>
 
-     <!-- Filter Section -->
+    <!-- Filter Section -->
     <div class="card mb-4">
         <div class="card-body">
-            <form id="filter-form" method="GET" class="form-inline">
+            <form id="filter-form"
+                  hx-get="{% url 'ai_models:future_sale_prediction' %}"
+                  hx-target="#future-sale-table-container"
+                  hx-swap="innerHTML"
+                  class="form-inline">
                 <div class="row g-3">
                     <div class="col-md-3">
                         <input type="text" class="form-control" name="user_id_filter"
@@ -39,7 +43,7 @@
                         <input type="number" step="0.01" class="form-control" name="max_cost"
                                value="{{ filters.max_cost }}" placeholder="Max Cost">
                     </div>
-                   <div class="col-md-3">
+                    <div class="col-md-3">
                         <input type="text"
                                class="form-control date-input"
                                name="start_date"
@@ -60,12 +64,18 @@
                                onblur="handleDateInputBlur(this)">
                     </div>
                     <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">Apply</button>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-1"></i>Filter
+                        </button>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" class="btn btn-outline-secondary w-100" id="clear-filters">
+                        <a href="{% url 'ai_models:future_sale_prediction' %}"
+                           class="btn btn-outline-secondary w-100"
+                           hx-get="{% url 'ai_models:future_sale_prediction' %}"
+                           hx-target="#future-sale-table-container"
+                           hx-swap="innerHTML">
                             Clear
-                        </button>
+                        </a>
                     </div>
                 </div>
             </form>
@@ -73,5 +83,7 @@
     </div>
 
     <!-- Table Container -->
-    {% include "ai_models/future_sale_table.html" %}
+    <div id="future-sale-table-container">
+        {% include "ai_models/future_sale_table.html" %}
+    </div>
 </div>
