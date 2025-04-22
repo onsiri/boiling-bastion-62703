@@ -95,7 +95,7 @@ class NewCustomerRecommendation(models.Model):
         default=RecommendationType.PERSONALIZED
     )
     confidence_score = models.FloatField(
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
     )
     generation_date = models.DateTimeField(auto_now_add=True)
     expiry_date = models.DateTimeField(

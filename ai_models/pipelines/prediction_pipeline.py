@@ -112,7 +112,7 @@ class PredictionPipeline:
                 user=customer,
                 item_code=item_code,
                 recommendation_type='PL',  # 'PL' for Personalized
-                confidence_score=count / len(all_items),
+                confidence_score=(count / len(all_items)) * 100,
                 generation_date=datetime.now(),
                 expiry_date=datetime.now() + timedelta(days=30)  # adjust expiry date as needed
             ))

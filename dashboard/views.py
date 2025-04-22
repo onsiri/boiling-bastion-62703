@@ -91,15 +91,9 @@ def get_sales_forecast_context(request):
     def get_base_queryset(model, group_field, selected):
         queryset = model.objects.all()
 
-        # Special case: Exclude multiple countries for "All" selection
+        # Special case: Exclude Brazil for "All" countries selection
         if model == CountrySaleForecast and selected == "All":
-            excluded_groups = [
-                "Brazil", "Canada", "Malta", "Bahrain",
-                "Saudi Arabia", "Lithuania", "Greece",
-                "Poland", "Iceland", "Lebanon",
-                "European Community"
-            ]
-            queryset = queryset.exclude(group__in=excluded_groups)
+            queryset = queryset.exclude(group="Brazil")  # Adjust field name if needed
 
         if selected != "All":
             queryset = queryset.filter(**{group_field: selected})
@@ -335,6 +329,10 @@ def sales_forecast_view(request):
 def sales_forecast_partial(request):
     context = get_combined_context(request)
     return render(request, 'dashboard/partials/main_content.html', context)
+
+
+
+
 
 
 def generate_chart_data(chart_type, filters):
