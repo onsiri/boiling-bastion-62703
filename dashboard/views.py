@@ -405,7 +405,7 @@ def get_personalization_context(request):
     avg_confidence = NextItemPrediction.objects.aggregate(
         avg_prob=Avg('Probability')
     )['avg_prob'] or 0
-    avg_confidence *= 1000  # Corrected to proper percentage conversion (not 1000)
+    avg_confidence *= 10   # Corrected to proper percentage conversion (not 1000)
 
     # 3. ARPU Calculation (removed redundant *10 multiplier)
     unique_users = NextItemPrediction.objects.aggregate(
@@ -525,7 +525,7 @@ def get_new_customer_rec_context(request):
     avg_confidence = NewCustomerRecommendation.objects.aggregate(
         avg_confidence=Avg('confidence_score')
     )['avg_confidence'] or 0
-    avg_confidence_percent = round(avg_confidence * 100, 1)
+    avg_confidence_percent = round(avg_confidence, 1)
 
     status_counts = NewCustomerRecommendation.objects.aggregate(
         active=Count(

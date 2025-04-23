@@ -25,12 +25,6 @@
                 .toLowerCase();       // Convert to lowercase
 
             console.log('Clicked product:', productName);
-
-             if (productName === 'customer recommendation') {
-                window.location.href = "{% url 'ai_models:future_sale' %}";
-            } else if (productName === 'new customer prediction') {
-                window.location.href = "{% url 'ai_models:customer_recommendations' %}";
-            }
             });
         });
     });
