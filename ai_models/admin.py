@@ -246,6 +246,7 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 country_forecasts_df = import_forecasts_from_s3('country_forecasts.csv')
                 upload_object_db('CountrySaleForecast', country_forecasts_df)
                 nextItem_forecasts_df = import_forecasts_from_s3('NextItemPrediction.csv')
+                nextItem_forecasts_df = nextItem_forecasts_df[nextItem_forecasts_df['PredictedItemCode'] != -1]
             except Exception as e:
                 analytics_errors.append(f"Forecast error: {str(e)}")
                 print(analytics_errors)

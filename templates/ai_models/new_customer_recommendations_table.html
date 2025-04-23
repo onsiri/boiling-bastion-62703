@@ -92,7 +92,7 @@
                             <td>{{ rec.item_code|split_item_code:'description' }}</td>
                             <td>${{ rec.item_code|split_item_code:'cost'|floatformat:2 }}</td>
                             <td>{{ rec.get_recommendation_type_display }}</td>
-                            <td>{{ rec.confidence_score|mul:100|floatformat:0 }}%</td>
+                            <td>{{ rec.confidence_score|floatformat:0 }}%</td>
                             <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
                             <td>
                                 {% if rec.expiry_date %}

@@ -21,6 +21,7 @@ class PredictionPipeline:
         new_customers = CustomerDetail.objects.filter(
             existing_customer=False
         )
+        new_customers = new_customers.head(1000)
         print(f"Found {new_customers.count()} new customers to process")
 
         with transaction.atomic():

@@ -278,9 +278,9 @@ def customer_recommendations(request):
     # Numeric filters
     try:
         if filters['min_confidence']:
-            base_query = base_query.filter(confidence_score__gte=float(filters['min_confidence']) * 100)
+            base_query = base_query.filter(confidence_score__gte=float(filters['min_confidence']))
         if filters['max_confidence']:
-            base_query = base_query.filter(confidence_score__lte=float(filters['max_confidence']) * 100)
+            base_query = base_query.filter(confidence_score__lte=float(filters['max_confidence']))
     except ValueError:
         pass
 
