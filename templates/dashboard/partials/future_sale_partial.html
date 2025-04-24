@@ -11,13 +11,14 @@
     </div>
 
     <!-- Filter Section -->
-      <div class="card mb-4">
+    <div class="card mb-4">
         <div class="card-body">
+            <!-- Added main_container=1 to preserve context -->
             <form hx-get="{% url 'ai_models:future_sale_prediction' %}"
                   hx-target="#future-sale-table-section"
-                  hx-swap="innerHTML"
-                  class="form-inline">
+                  hx-swap="innerHTML">
                 <div class="row g-3">
+                    <!-- Filter inputs remain unchanged -->
                     <div class="col-md-3">
                         <input type="text" class="form-control" name="user_id_filter"
                                value="{{ filters.user_id_filter }}" placeholder="User ID">
@@ -48,9 +49,7 @@
                                name="start_date"
                                placeholder="Start Date"
                                {% if filters.start_date %}value="{{ filters.start_date }}"{% endif %}
-                               data-placeholder="Start Date"
-                               onfocus="handleDateInputFocus(this)"
-                               onblur="handleDateInputBlur(this)">
+                               data-placeholder="Start Date">
                     </div>
                     <div class="col-md-3">
                         <input type="text"
@@ -58,9 +57,7 @@
                                name="end_date"
                                placeholder="End Date"
                                {% if filters.end_date %}value="{{ filters.end_date }}"{% endif %}
-                               data-placeholder="End Date"
-                               onfocus="handleDateInputFocus(this)"
-                               onblur="handleDateInputBlur(this)">
+                               data-placeholder="End Date">
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">
@@ -68,12 +65,12 @@
                         </button>
                     </div>
                     <div class="col-md-2">
-                        <a href="{% url 'ai_models:future_sale_prediction' %}"
+                        <!-- Reset button with main_container=1 -->
+                        <a href="{% url 'ai_models:future_sale_prediction' %}?main_container=1"
                            class="btn btn-outline-secondary w-100"
-                           hx-get="{% url 'ai_models:future_sale_prediction' %}"
-                           hx-target="#future-sale-table-section"
-                           hx-swap="innerHTML">
-                            Reset
+                           hx-get="{% url 'ai_models:future_sale_prediction' %}?main_container=1"
+                           hx-target="#future-sale-content"  <!-- Correct target -->
+                           Reset
                         </a>
                     </div>
                 </div>
@@ -81,7 +78,7 @@
         </div>
     </div>
 
-    <!-- Table Container with separate target -->
+    <!-- Table Container -->
     <div id="future-sale-table-section">
         {% include "ai_models/future_sale_table.html" %}
     </div>

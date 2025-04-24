@@ -230,11 +230,14 @@ def future_sale_prediction(request):
 
     # Determine template based on request type
     if request.headers.get('HX-Request'):
+        # Check if the HTMX request is targeting the main container
         if request.GET.get('main_container') == '1':
             template = "dashboard/partials/future_sale_partial.html"
         else:
+            # Default to the table template for HTMX table updates
             template = "ai_models/future_sale_table.html"
     else:
+        # Full page request (initial load)
         template = "dashboard/partials/future_sale_partial.html"
 
     return render(request, template, context)

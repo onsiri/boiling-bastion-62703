@@ -74,8 +74,13 @@
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}user__UserId" class="rec-sort-header">Customer ID</a></th>
-                            <th>Item Code</th>
+                            <th>
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?sort_by=user"
+                                   hx-target="#recommendations-table-content"
+                                   hx-swap="innerHTML">
+                                    Customer ID {% if sort_by == 'user' %}({{ sort_order|capfirst }}){% endif %}
+                                </a>
+                            </th><th>Item Code</th>
                             <th>Description</th>
                             <th>Unit Cost</th>
                             <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type" class="rec-sort-header">Type</a></th>

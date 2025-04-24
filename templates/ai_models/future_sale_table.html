@@ -8,7 +8,7 @@
                 <thead class="table-light">
                     <tr>
                         <th><a href="?sort_by={% if sort_by == 'UserId' and sort_order == 'asc' %}-{% endif %}UserId{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            User ID {% if sort_by == 'UserId' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                            Customer ID {% if sort_by == 'UserId' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
                         </a></th>
                         <th><a href="?sort_by={% if sort_by == 'PredictedItemDescription' and sort_order == 'asc' %}-{% endif %}PredictedItemDescription{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
                             Item Description {% if sort_by == 'PredictedItemDescription' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
@@ -30,7 +30,7 @@
                             <td>{{ item.UserId }}</td>
                             <td>{{ item.PredictedItemDescription }}</td>
                             <td>{{ item.Probability|mul:100|floatformat:2 }}%</td>
-                            <td>\${{ item.PredictedItemCost }}</td>
+                            <td>${{ item.PredictedItemCost }}</td>
                             <td>{{ item.PredictedAt|date:"Y-m-d H:i" }}</td>
                         </tr>
                     {% empty %}
