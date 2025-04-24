@@ -1,16 +1,27 @@
 {% load custom_filters %}
+{% load urlencode_replace %}
+
 <div id="recommendation-table" class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th><a href="?sort_by=UserId&sort_order={% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">User ID</a></th>
-                        <th><a href="?sort_by=PredictedItemDescription&sort_order={% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Item Description</a></th>
-                        <th><a href="?sort_by=Probability&sort_order={% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Probability</a></th>
-                        <th><a href="?sort_by=PredictedItemCost&sort_order={% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Item Cost</a></th>
-                        <!-- Add PredictedAt header -->
-                        <th><a href="?sort_by=PredictedAt&sort_order={% if sort_by == 'PredictedAt' %}{% if sort_order == 'asc' %}desc{% else %}asc{% endif %}{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">Prediction Date</a></th>
+                        <th><a href="?sort_by={% if sort_by == 'UserId' and sort_order == 'asc' %}-{% endif %}UserId{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
+                            User ID {% if sort_by == 'UserId' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                        </a></th>
+                        <th><a href="?sort_by={% if sort_by == 'PredictedItemDescription' and sort_order == 'asc' %}-{% endif %}PredictedItemDescription{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
+                            Item Description {% if sort_by == 'PredictedItemDescription' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                        </a></th>
+                        <th><a href="?sort_by={% if sort_by == 'Probability' and sort_order == 'asc' %}-{% endif %}Probability{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
+                            Probability {% if sort_by == 'Probability' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                        </a></th>
+                        <th><a href="?sort_by={% if sort_by == 'PredictedItemCost' and sort_order == 'asc' %}-{% endif %}PredictedItemCost{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
+                            Item Cost {% if sort_by == 'PredictedItemCost' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                        </a></th>
+                        <th><a href="?sort_by={% if sort_by == 'PredictedAt' and sort_order == 'asc' %}-{% endif %}PredictedAt{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
+                            Prediction Date {% if sort_by == 'PredictedAt' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
+                        </a></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -19,13 +30,12 @@
                             <td>{{ item.UserId }}</td>
                             <td>{{ item.PredictedItemDescription }}</td>
                             <td>{{ item.Probability|mul:100|floatformat:2 }}%</td>
-                            <td>${{ item.PredictedItemCost }}</td>
-                            <!-- Add PredictedAt cell -->
+                            <td>\${{ item.PredictedItemCost }}</td>
                             <td>{{ item.PredictedAt|date:"Y-m-d H:i" }}</td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center">No predictions found</td>  <!-- Update colspan to 5 -->
+                            <td colspan="5" class="text-center">No predictions found</td>
                         </tr>
                     {% endfor %}
                 </tbody>

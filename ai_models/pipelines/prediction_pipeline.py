@@ -20,7 +20,7 @@ class PredictionPipeline:
         print("[3/4] Fetching new customers...")
         new_customers = CustomerDetail.objects.filter(
             existing_customer=False
-        )[:100]
+        )[:500]
 
         print(f"Found {new_customers.count()} new customers to process")
 

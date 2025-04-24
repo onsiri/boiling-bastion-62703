@@ -40,7 +40,7 @@
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>DS <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}asc{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+                            <th>Date <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}asc{% else %}desc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction <a href="?sort_by=prediction&sort_order={% if sort_by == 'prediction' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction Lower <a href="?sort_by=prediction_lower&sort_order={% if sort_by == 'prediction_lower' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_lower' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
                             <th>Prediction Upper <a href="?sort_by=prediction_upper&sort_order={% if sort_by == 'prediction_upper' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_upper' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
@@ -113,18 +113,42 @@
 
 <script>
 \$(document).ready(function() {
+    // Handle sorting
     \$('th .sort-link').click(function(e) {
         e.preventDefault();
         var url = \$(this).attr('href');
-
-        \$.ajax({
-            url: url,
-            headers: {'X-Requested-With': 'XMLHttpRequest'},
-            success: function(data) {
-                \$('.table-responsive').html(\$(data).find('.table-responsive').html());
-                window.history.replaceState(null, null, url);
-            }
-        });
+        loadPartial(url);
     });
+
+    // Handle pagination
+    \$(document).on('click', '.page-link', function(e) {
+        e.preventDefault();
+        var url = \$(this).attr('href');
+        loadPartial(url);
+    });
+
+    function loadPartial(url) {
+    \$.ajax({
+        url: url,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        success: function(data) {
+            \$('.table-responsive').html(\$(data).find('.table-responsive').html());
+
+            // Construct the new URL with the correct hash
+            var newUrl = url.split('#')[0] + '#top30-forecast';
+            window.history.replaceState(null, null, newUrl);
+
+            // Activate the Sales Forecast tab using Bootstrap's API
+            var salesForecastTab = document.querySelector('a[href="#top30-forecast"]');
+            if (salesForecastTab) {
+                var tab = new bootstrap.Tab(salesForecastTab);
+                tab.show();
+            }
+        },
+        error: function(xhr) {
+            console.error('Error loading content:', xhr.statusText);
+        }
+    });
+}
 });
 </script>

@@ -20,3 +20,8 @@ def split_item_code(value, part):
         }.get(part, 'N/A')
     except (ValueError, SyntaxError, IndexError):
         return 'N/A'
+
+@register.filter(name='toggle')
+def toggle(value):
+    """Toggle between asc/desc for sorting"""
+    return 'desc' if value == 'asc' else 'asc'

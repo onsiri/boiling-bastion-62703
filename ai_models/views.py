@@ -22,6 +22,7 @@ from django.db.models import Min, Max
 from django.utils.dateparse import parse_date
 
 def top_30_sale_forecast(request):
+    active_tab = request.GET.get('active_tab', 'top30-forecast')
     # Calculate date range (tomorrow + 30 days)
     today = timezone.now().date()
     start_date = today + timedelta(days=1)
@@ -101,14 +102,20 @@ def top_30_sale_forecast(request):
         'sort_by': sort_by,
         'sort_order': sort_order,
         'request': request,
-        'date_range': f"{start_date} to {end_date}"
+        'date_range': f"{start_date} to {end_date}",
+        'active_tab': active_tab  # Add this
     }
 
-    return render(request, 'ai_models/top_30_sale_forecast.html', context)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template_name = 'dashboard/partials/top_30_sale_forecast_partial.html'
+    else:
+        template_name = 'dashboard/sales_forecast.html'
+
+    return render(request, template_name, context)
 
 
 def future_sale_prediction(request):
-    # Get and clean filter parameters
+    # Filter parameters
     filters = {
         'user_id_filter': request.GET.get('user_id_filter', '').strip(),
         'description_filter': request.GET.get('description_filter', '').strip(),
@@ -130,12 +137,18 @@ def future_sale_prediction(request):
     if filters['description_filter']:
         base_query = base_query.filter(PredictedItemDescription__icontains=filters['description_filter'])
 
+    # Date filters
+    if filters['start_date']:
+        base_query = base_query.filter(PredictedAt__gte=filters['start_date'])
+    if filters['end_date']:
+        base_query = base_query.filter(PredictedAt__lte=filters['end_date'])
+
     # Numeric filters with validation
     try:
         if filters['min_probability']:
-            base_query = base_query.filter(Probability__gte=float(filters['min_probability'])/100)
+            base_query = base_query.filter(Probability__gte=float(filters['min_probability']) / 100)
         if filters['max_probability']:
-            base_query = base_query.filter(Probability__lte=float(filters['max_probability'])/100)
+            base_query = base_query.filter(Probability__lte=float(filters['max_probability']) / 100)
         if filters['min_cost']:
             base_query = base_query.filter(PredictedItemCost__gte=float(filters['min_cost']))
         if filters['max_cost']:
@@ -145,64 +158,54 @@ def future_sale_prediction(request):
 
     # CSV Export Handling
     if request.GET.get('export') == 'csv':
-        today = timezone.now().date()
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="Customer_Purchase_Probability_{today}.csv"'
-        response['X-Content-Type-Options'] = 'nosniff'
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Content-Disposition'] = f'attachment; filename="Customer_Predictions_{timezone.now().date()}.csv"'
 
-        writer = csv.writer(response)  # Critical missing line
+        writer = csv.writer(response)
         writer.writerow([
             'User ID', 'Prediction Date', 'Probability (%)',
             'Item Description', 'Item Cost', 'Prediction Timestamp'
         ])
 
         try:
-            # Sorting configuration for HTML view
-            valid_sort_fields = [...]
-            sort_by = request.GET.get('sort_by', 'Probability')
-            sort_order = request.GET.get('sort_order', 'desc')
-            # Validate sorting parameters
-            if sort_by not in valid_sort_fields:
-                sort_by = 'Probability'
-                sort_order = 'desc'
-            # Create order_by expression
-            order_prefix = '-' if sort_order == 'desc' else ''
-            order_by = f'{order_prefix}{sort_by}'
-            ordered = base_query.order_by(order_by, '-Probability')
-            for item in ordered:
-                predicted_date = item.PredictedAt.strftime('%Y-%m-%d') if item.PredictedAt else 'N/A'
-                timestamp = item.PredictedAt.strftime('%Y-%m-%d %H:%M') if item.PredictedAt else 'N/A'
+            # Sorting logic matching the main view
+            valid_sort_fields = ['UserId', 'PredictedItemDescription', 'Probability', 'PredictedItemCost', 'PredictedAt']
+            sort_by_param = request.GET.get('sort_by', '-Probability')
+            sort_field = sort_by_param.lstrip('-')
 
+            if sort_field not in valid_sort_fields:
+                sort_by_param = '-Probability'
+                sort_field = 'Probability'
+
+            ordered = base_query.order_by(sort_by_param)
+
+            for item in ordered:
                 writer.writerow([
-                    item.UserId or 'N/A',
-                    predicted_date,
-                    f"{item.Probability * 100:.2f}" if item.Probability else '0.00',
-                    item.PredictedItemDescription or 'N/A',
-                    f"${item.PredictedItemCost:.2f}" if item.PredictedItemCost is not None else '\$0.00',
-                    timestamp
+                    item.UserId,
+                    item.PredictedAt.date() if item.PredictedAt else 'N/A',
+                    f"{item.Probability * 100:.2f}",
+                    item.PredictedItemDescription,
+                    f"{item.PredictedItemCost:.2f}",
+                    item.PredictedAt.strftime('%Y-%m-%d %H:%M') if item.PredictedAt else 'N/A'
                 ])
             return response
         except Exception as e:
             return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
 
-    # Sorting configuration for HTML view
-    valid_sort_fields = ['UserId', 'PredictedAt', 'Probability',
-                         'PredictedItemDescription', 'PredictedItemCost']
-    sort_by = request.GET.get('sort_by', 'Probability')
-    sort_order = request.GET.get('sort_order', 'desc')
+    # Sorting configuration
+    valid_sort_fields = ['UserId', 'PredictedItemDescription', 'Probability', 'PredictedItemCost', 'PredictedAt']
+    sort_by_param = request.GET.get('sort_by', '-Probability')  # Default sort by Probability descending
+    sort_field = sort_by_param.lstrip('-')
+    sort_order = 'desc' if sort_by_param.startswith('-') else 'asc'
 
     # Validate sorting parameters
-    if sort_by not in valid_sort_fields:
-        sort_by = 'Probability'
+    if sort_field not in valid_sort_fields:
+        sort_by_param = '-Probability'
+        sort_field = 'Probability'
         sort_order = 'desc'
 
-    # Create order_by expression
-    order_prefix = '-' if sort_order == 'desc' else ''
-    order_by = f'{order_prefix}{sort_by}'
-
-    # Apply sorting with Probability as secondary sort
-    ordered = base_query.order_by(order_by, '-Probability')
+    # Apply sorting
+    ordered = base_query.order_by(sort_by_param)
 
     # Pagination
     paginator = Paginator(ordered, 20)
@@ -215,38 +218,26 @@ def future_sale_prediction(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
 
-    date_range = NextItemPrediction.objects.aggregate(
-        min_ds=Min('PredictedAt'),
-        max_ds=Max('PredictedAt')
-    )
-
-    # Format dates for HTML input
-    min_ds = date_range['min_ds'].strftime('%Y-%m-%d') if date_range['min_ds'] else ''
-    max_ds = date_range['max_ds'].strftime('%Y-%m-%d') if date_range['max_ds'] else ''
-
     context = {
         'page_obj': page_obj,
-        'sort_by': sort_by,
+        'sort_by': sort_field,
         'sort_order': sort_order,
         'filters': filters,
         'request': request,
-        'min_ds': min_ds,  # Add these
-        'max_ds': max_ds   # to context
+        'min_ds': NextItemPrediction.objects.aggregate(Min('PredictedAt'))['PredictedAt__min'] or '',
+        'max_ds': NextItemPrediction.objects.aggregate(Max('PredictedAt'))['PredictedAt__max'] or '',
     }
 
-    if request.headers.get('HX-Request') == 'true' and 'main-container' not in request.GET:
-        template = "ai_models/future_sale_table.html"  # Table only
+    # Determine template based on request type
+    if request.headers.get('HX-Request'):
+        if request.GET.get('main_container') == '1':
+            template = "dashboard/partials/future_sale_partial.html"
+        else:
+            template = "ai_models/future_sale_table.html"
     else:
-        template = "dashboard/partials/future_sale_partial.html"  # Full content
+        template = "dashboard/partials/future_sale_partial.html"
 
     return render(request, template, context)
-@csrf_exempt
-def generate_recommendations(request):
-    if request.method == 'POST':
-        task = generate_predictions_task.delay()
-        return JsonResponse({'task_id': task.id})
-    else:
-        return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
 def customer_recommendations(request):
@@ -294,8 +285,11 @@ def customer_recommendations(request):
 
     # Sorting
     valid_sort_fields = [
-        'user__UserId', 'item_code', 'confidence_score',
-        'generation_date', 'expiry_date', 'recommendation_type'
+        'UserId',
+        'PredictedItemDescription',
+        'Probability',
+        'PredictedItemCost',
+        'PredictedAt'  # ← Ensure this matches model field exactly
     ]
     sort_by = request.GET.get('sort_by', '-confidence_score')
     sort_order = 'desc' if sort_by.startswith('-') else 'asc'
@@ -360,3 +354,11 @@ def check_task_status(request):
         'status': result.state,
         'result': result.result if result.ready() else None
     })
+
+@csrf_exempt
+def generate_recommendations(request):
+    if request.method == 'POST':
+        task = generate_predictions_task.delay()
+        return JsonResponse({'task_id': task.id})
+    else:
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
