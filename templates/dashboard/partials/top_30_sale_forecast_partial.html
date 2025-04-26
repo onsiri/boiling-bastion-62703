@@ -1,27 +1,7 @@
 <div class="container mt-4">
     {% load humanize %}
     <style>
-        .sort-indicator {
-            display: inline-block;
-            width: 0;
-            height: 0;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            margin-left: 5px;
-        }
-        .sort-indicator.asc {
-            border-bottom: 5px solid black;
-        }
-        .sort-indicator.desc {
-            border-top: 5px solid black;
-        }
-        .table-responsive {
-            overflow-x: auto;
-        }
-        .pagination-list {
-            list-style: none;
-            padding: 0;
-        }
+
     </style>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -40,11 +20,41 @@
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>Date <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
-                            <th>Prediction <a href="?sort_by=prediction&sort_order={% if sort_by == 'prediction' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
-                            <th>Prediction Lower <a href="?sort_by=prediction_lower&sort_order={% if sort_by == 'prediction_lower' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_lower' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
-                            <th>Prediction Upper <a href="?sort_by=prediction_upper&sort_order={% if sort_by == 'prediction_upper' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'prediction_upper' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
-                            <th>Uploaded At <a href="?sort_by=uploaded_at&sort_order={% if sort_by == 'uploaded_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" class="sort-link"><span class="sort-indicator {% if sort_by == 'uploaded_at' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% else %}asc{% endif %}"></span></a></th>
+                            <th>
+                                <a href="?sort_by=ds&sort_order={% if sort_by == 'ds' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+                                   class="sort-link d-inline-flex align-items-center">
+                                    Date
+                                    <span class="sort-indicator {% if sort_by == 'ds' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort_by=prediction&sort_order={% if sort_by == 'prediction' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+                                   class="sort-link d-inline-flex align-items-center">
+                                    Prediction
+                                    <span class="sort-indicator {% if sort_by == 'prediction' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort_by=prediction_lower&sort_order={% if sort_by == 'prediction_lower' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+                                   class="sort-link d-inline-flex align-items-center">
+                                    Prediction Lower
+                                    <span class="sort-indicator {% if sort_by == 'prediction_lower' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort_by=prediction_upper&sort_order={% if sort_by == 'prediction_upper' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+                                   class="sort-link d-inline-flex align-items-center">
+                                    Prediction Upper
+                                    <span class="sort-indicator {% if sort_by == 'prediction_upper' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort_by=uploaded_at&sort_order={% if sort_by == 'uploaded_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}{% for key,value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+                                   class="sort-link d-inline-flex align-items-center">
+                                    Prediction Date
+                                    <span class="sort-indicator {% if sort_by == 'uploaded_at' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                                </a>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>

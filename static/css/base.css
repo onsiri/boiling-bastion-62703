@@ -440,6 +440,7 @@ body {
         background: white;
         margin-bottom: 25px;
 }
+
 .compact-section {
         padding: 0.8rem;
         border-radius: 0.5rem;
@@ -518,4 +519,34 @@ body {
     content: attr(placeholder);
     color: #666;
     margin-right: 0.5em;
+}
+.sort-indicator {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    margin-left: 5px;
+    /* show down arrow by default (desc) */
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid black;
+}
+
+.sort-indicator.asc {
+    border-bottom: 5px solid transparent; /* Hide down arrow */
+    border-top: 5px solid black; /* Show up arrow */
+}
+
+.sort-indicator.desc {
+    border-top: 5px solid transparent; /* Hide up arrow */
+    border-bottom: 5px solid black; /* Show down arrow */
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.pagination-list {
+    list-style: none;
+    padding: 0;
 }

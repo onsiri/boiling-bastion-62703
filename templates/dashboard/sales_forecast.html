@@ -1,95 +1,100 @@
 <!DOCTYPE html>
 {% extends "base.html" %}
-
 {% block content %}
-    <h2>Sale Forecast Dashboard</h2>
+<h2>Sales Forecast Dashboard</h2>
 
-    <!-- Tabs Navigation -->
-    <ul class="nav nav-tabs mb-4" id="dashboardTabs">
-        <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="?active_tab=top30-forecast#top30-forecast">Sales Forecast</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="?active_tab=dashboard-content#dashboard-content">Analytic Dashboard</a>
-        </li>
-    </ul>
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs mb-4" id="dashboardTabs">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="?active_tab=top30-forecast#top30-forecast">Sales Forecast</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="?active_tab=dashboard-content#dashboard-content">Analytic Dashboard</a>
+    </li>
+</ul>
 
-    <!-- Tab Content -->
-    <div class="tab-content">
-         <!-- Top 30 Forecast Tab -->
-        <div class="tab-pane fade show active" id="top30-forecast">
-            {% include "dashboard/partials/top_30_sale_forecast_partial.html" %}
-        </div>
-         <!-- Dashboard Tab -->
-        <div class="tab-pane fade" id="dashboard-content">
-            <div id="main-content">
-                {% include "dashboard/partials/main_content.html" %}
-            </div>
-        </div>
+<!-- Tab Content -->
+<div class="tab-content">
+    <!-- Top 30 Forecast Tab -->
+    <div class="tab-pane fade show active" id="top30-forecast">
+        {% include "dashboard/partials/top_30_sale_forecast_partial.html" %}
     </div>
 
-    <!-- Required Scripts -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- Add this line -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Dashboard Tab -->
+    <div class="tab-pane fade" id="dashboard-content">
+        <div id="main-content">
+            {% include "dashboard/partials/main_content.html" %}
+        </div>
+    </div>
+</div>
 
+<!-- Required Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-    <!-- Enable HTMX scripts -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            htmx.config.allowScripts = true;
+<style>
+    /* Ensure charts take full container width */
+    .chart-wrapper {
+        width: 100% !important;
+        position: relative;
+    }
+    .plot-container {
+        width: 100% !important;
+    }
+</style>
+
+<script>
+    // Initialize all Plotly charts
+    function initPlots() {
+        // Target all plot containers
+        const plotContainers = [
+            'country-pie-plot',
+            'item-pie-plot',
+            'country-forecast-plot',
+            'item-forecast-plot'
+        ];
+
+        plotContainers.forEach(id => {
+            const element = document.getElementById(id);
+            if (element && typeof Plotly !== 'undefined') {
+                // Purge existing plot
+                Plotly.purge(element);
+
+                // Get dimensions from parent container
+                const parent = element.closest('.chart-wrapper');
+                const width = parent ? parent.offsetWidth : element.offsetWidth;
+                const height = parent ? parent.offsetHeight : element.offsetHeight;
+
+                // Set explicit dimensions
+                element.style.width = width + 'px';
+                element.style.height = height + 'px';
+
+                // Reinitialize plot with responsive config
+                const data = JSON.parse(element.dataset.plot);
+                Plotly.newPlot(element, data, {}, {
+                    responsive: true,
+                    displayModeBar: false
+                });
+            }
         });
-    </script>
+    }
 
-    <!-- Chart initialization script -->
-    <script>
-    // Initialize charts
-        function initCharts() {
-            ['country-pie-plot', 'item-pie-plot'].forEach(id => {
-                const element = document.getElementById(id);
-                if (element && typeof Plotly !== 'undefined') {
-                    // Purge existing plot before reinitializing
-                    Plotly.purge(element);
+    // Resize handler
+    function handleResize() {
+        Plotly.Plots.resize(document.getElementById('country-forecast-plot'));
+        Plotly.Plots.resize(document.getElementById('item-forecast-plot'));
+    }
 
-                    // Extract data from Django template
-                    const plotData = JSON.parse(element.getAttribute('data-plot'));
-                    Plotly.newPlot(element, plotData.data, plotData.layout);
-                }
-            });
-        }
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        initPlots();
+        window.addEventListener('resize', handleResize);
+    });
 
-        // Auto-resize handler
-        function initResize(containerId) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-
-            const observer = new ResizeObserver(() => {
-                Plotly.Plots.resize(container);
-            });
-
-            observer.observe(container);
-        }
-
-        // Initial load
-        document.addEventListener('DOMContentLoaded', function() {
-            initCharts();
-            ['country-pie-plot', 'item-pie-plot'].forEach(initResize);
-        });
-
-        // HTMX content swap handler
-        document.addEventListener('htmx:afterSwap', function() {
-            setTimeout(() => {
-                initCharts();
-                ['country-pie-plot', 'item-pie-plot'].forEach(initResize);
-            }, 50);
-        });
-
-        // Window resize handler
-        window.addEventListener('resize', function() {
-            ['country-pie-plot', 'item-pie-plot'].forEach(id => {
-                const element = document.getElementById(id);
-                if (element) Plotly.Plots.resize(element);
-            });
-        });
-        </script>
+    // HTMX content swap handler
+    document.addEventListener('htmx:afterSwap', () => {
+        setTimeout(initPlots, 100);
+    });
+</script>
 {% endblock %}

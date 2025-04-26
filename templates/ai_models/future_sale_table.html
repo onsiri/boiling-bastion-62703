@@ -7,21 +7,41 @@
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th><a href="?sort_by={% if sort_by == 'UserId' and sort_order == 'asc' %}-{% endif %}UserId{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            Customer ID {% if sort_by == 'UserId' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
-                        </a></th>
-                        <th><a href="?sort_by={% if sort_by == 'PredictedItemDescription' and sort_order == 'asc' %}-{% endif %}PredictedItemDescription{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            Item Description {% if sort_by == 'PredictedItemDescription' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
-                        </a></th>
-                        <th><a href="?sort_by={% if sort_by == 'Probability' and sort_order == 'asc' %}-{% endif %}Probability{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            Probability {% if sort_by == 'Probability' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
-                        </a></th>
-                        <th><a href="?sort_by={% if sort_by == 'PredictedItemCost' and sort_order == 'asc' %}-{% endif %}PredictedItemCost{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            Item Cost {% if sort_by == 'PredictedItemCost' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
-                        </a></th>
-                        <th><a href="?sort_by={% if sort_by == 'PredictedAt' and sort_order == 'asc' %}-{% endif %}PredictedAt{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="sort-header">
-                            Prediction Date {% if sort_by == 'PredictedAt' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% endif %}
-                        </a></th>
+                        <th>
+                            <a href="?sort_by={% if sort_by == 'UserId' and sort_order == 'asc' %}-{% endif %}UserId{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="sort-header d-inline-flex align-items-center">
+                                Customer ID
+                                <span class="sort-indicator {% if sort_by == 'UserId' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort_by={% if sort_by == 'PredictedItemDescription' and sort_order == 'asc' %}-{% endif %}PredictedItemDescription{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="sort-header d-inline-flex align-items-center">
+                                Item Description
+                                <span class="sort-indicator {% if sort_by == 'PredictedItemDescription' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort_by={% if sort_by == 'Probability' and sort_order == 'asc' %}-{% endif %}Probability{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="sort-header d-inline-flex align-items-center">
+                                Probability
+                                <span class="sort-indicator {% if sort_by == 'Probability' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort_by={% if sort_by == 'PredictedItemCost' and sort_order == 'asc' %}-{% endif %}PredictedItemCost{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="sort-header d-inline-flex align-items-center">
+                                Item Cost
+                                <span class="sort-indicator {% if sort_by == 'PredictedItemCost' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort_by={% if sort_by == 'PredictedAt' and sort_order == 'asc' %}-{% endif %}PredictedAt{% for key,value in request.GET.items %}{% if key != 'sort_by' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                               class="sort-header d-inline-flex align-items-center">
+                                Prediction Date
+                                <span class="sort-indicator {% if sort_by == 'PredictedAt' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"></span>
+                            </a>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>

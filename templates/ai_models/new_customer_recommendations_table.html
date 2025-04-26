@@ -1,8 +1,8 @@
 {% load custom_filters %}
-
+{% load urlencode_replace %}
 <div id="recommendation-table" class="card shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Customer Recommendations</h5>
+        <h5 class="mb-0">New Customer Recommendations</h5>
         <button
             onclick="window.location.href='{% url 'ai_models:customer_recommendations' %}?export=true{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}'"
             class="btn btn-sm btn-primary">
@@ -68,25 +68,78 @@
         </form>
     </div>
 
+    <!-- Sort Section -->
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive" id="recommendations-table-content">
             {% if page_obj %}
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
+                            <!-- Customer ID Column -->
                             <th>
-                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?sort_by=user"
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?{% for key,value in request.GET.items %}{% if key != 'sort_by' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}sort_by={% if sort_by == 'user__UserId' %}{% if sort_order == 'asc' %}-{% endif %}{% endif %}user__UserId"
                                    hx-target="#recommendations-table-content"
-                                   hx-swap="innerHTML">
-                                    Customer ID {% if sort_by == 'user' %}({{ sort_order|capfirst }}){% endif %}
+                                   hx-swap="innerHTML"
+                                   class="d-inline-flex align-items-center">
+                                    Customer ID
+                                    <span class="sort-indicator {% if sort_by == 'user__UserId' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"
+                                          style="margin-left: 8px;"></span>
                                 </a>
-                            </th><th>Item Code</th>
-                            <th>Description</th>
-                            <th>Unit Cost</th>
-                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}recommendation_type" class="rec-sort-header">Type</a></th>
-                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}confidence_score" class="rec-sort-header">Probability</a></th>
-                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}generation_date" class="rec-sort-header">Generated</a></th>
-                            <th><a href="?sort_by={% if sort_order == 'asc' %}-{% endif %}expiry_date" class="rec-sort-header">Expires</a></th>
+                            </th>
+
+
+                            <!-- Item Code (Non-sortable) -->
+                            <th>Item Code</th>
+                            <th>Item Description</th>
+                            <th>Item Cost</th>
+
+                           <!-- Recommendation Type Column -->
+                            <th>
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?{% for key,value in request.GET.items %}{% if key != 'sort_by' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}sort_by={% if sort_by == 'recommendation_type' %}{% if sort_order == 'asc' %}-{% endif %}{% endif %}recommendation_type"
+                                   hx-target="#recommendations-table-content"
+                                   hx-swap="innerHTML"
+                                   class="d-inline-flex align-items-center">
+                                    Type
+                                    <span class="sort-indicator {% if sort_by == 'recommendation_type' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"
+                                          style="margin-left: 8px;"></span>
+                                </a>
+                            </th>
+
+                            <!-- Confidence Score Column -->
+                            <th>
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?{% for key,value in request.GET.items %}{% if key != 'sort_by' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}sort_by={% if sort_by == 'confidence_score' %}{% if sort_order == 'asc' %}-{% endif %}{% endif %}confidence_score"
+                                   hx-target="#recommendations-table-content"
+                                   hx-swap="innerHTML"
+                                   class="d-inline-flex align-items-center">
+                                    Probability
+                                    <span class="sort-indicator {% if sort_by == 'confidence_score' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"
+                                          style="margin-left: 8px;"></span>
+                                </a>
+                            </th>
+
+                            <!-- Generation Date Column -->
+                            <th>
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?{% for key,value in request.GET.items %}{% if key != 'sort_by' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}sort_by={% if sort_by == 'generation_date' %}{% if sort_order == 'asc' %}-{% endif %}{% endif %}generation_date"
+                                   hx-target="#recommendations-table-content"
+                                   hx-swap="innerHTML"
+                                   class="d-inline-flex align-items-center">
+                                    Prediction Date
+                                    <span class="sort-indicator {% if sort_by == 'generation_date' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"
+                                          style="margin-left: 8px;"></span>
+                                </a>
+                            </th>
+
+                            <!-- Expiry Date Column -->
+                            <th>
+                                <a hx-get="{% url 'ai_models:customer_recommendations' %}?{% for key,value in request.GET.items %}{% if key != 'sort_by' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}sort_by={% if sort_by == 'expiry_date' %}{% if sort_order == 'asc' %}-{% endif %}{% endif %}expiry_date"
+                                   hx-target="#recommendations-table-content"
+                                   hx-swap="innerHTML"
+                                   class="d-inline-flex align-items-center">
+                                    Expires
+                                    <span class="sort-indicator {% if sort_by == 'expiry_date' %}{% if sort_order == 'asc' %}asc{% else %}desc{% endif %}{% endif %}"
+                                          style="margin-left: 8px;"></span>
+                                </a>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -95,21 +148,11 @@
                             <td>{{ rec.user.UserId }}</td>
                             <td>{{ rec.item_code|split_item_code:'code' }}</td>
                             <td>{{ rec.item_code|split_item_code:'description' }}</td>
-                            <td>${{ rec.item_code|split_item_code:'cost'|floatformat:2 }}</td>
+                            <td>{{ rec.item_code|split_item_code:'cost'|format_currency }}</td>
                             <td>{{ rec.get_recommendation_type_display }}</td>
-                            <td>{{ rec.confidence_score|floatformat:0 }}%</td>
-                            <td>{{ rec.generation_date|date:"Y-m-d H:i" }}</td>
-                            <td>
-                                {% if rec.expiry_date %}
-                                    {{ rec.expiry_date|date:"Y-m-d H:i" }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-center">No recommendations found</td>
+                            <td>{{ rec.confidence_score|floatformat:2 }}%</td>
+                            <td>{{ rec.generation_date|format_datetime }}</td>
+                            <td>{{ rec.expiry_date|format_datetime }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

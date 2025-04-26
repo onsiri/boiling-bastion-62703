@@ -82,26 +82,35 @@
         </div>
     </div>
 </form>
-<!-- Country Chart -->
-    <div class="chart-container mb-4">
-        <h4>Country Sales Forecast</h4>
-        {% if country_plot %}
-            <div class="chart-wrapper" style="height: 400px">
-                {{ country_plot|safe }}
-            </div>
-        {% else %}
-            <div class="alert alert-warning mt-3">No country forecast data available</div>
-        {% endif %}
+<!-- Country Forecast Section -->
+<div class="row">  <!-- Add this row -->
+    <div class="col-12">  <!-- Full-width column -->
+        <div class="chart-container mb-4">
+            <h4>Country Sales Forecast</h4>
+            {% if country_plot %}
+                <div class="chart-wrapper" style="height: 400px">
+                    {{ country_plot|safe }}
+                </div>
+            {% else %}
+                <!-- No data message -->
+            {% endif %}
+        </div>
     </div>
-<!-- Item Forecast Section -->
+</div>
 
-    <div class="chart-container mb-4">
-        <h4>Item Sales Forecast</h4>
-        {% if item_plot %}
-            <div class="chart-wrapper" style="height: 400px">
-                {{ item_plot|safe }}
-            </div>
-        {% else %}
-            <div class="alert alert-warning mt-3">No item forecast data available</div>
-        {% endif %}
+<!-- Item Forecast Section -->
+<div class="row">  <!-- Add this row -->
+    <div class="col-12">  <!-- Full-width column -->
+        <div class="chart-container mb-4">
+            <h4>Item Sales Forecast</h4>
+            {% if item_plot %}
+                <div class="chart-wrapper" style="height: 400px">
+                    {{ item_plot|safe }}
+                </div>
+            {% else %}
+                <!-- No data message -->
+            {% endif %}
+        </div>
     </div>
+</div>
+

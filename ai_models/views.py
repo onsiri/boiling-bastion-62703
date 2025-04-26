@@ -286,24 +286,27 @@ def customer_recommendations(request):
     if filters['expiry_date']:
         base_query = base_query.filter(expiry_date__lte=filters['expiry_date'])
 
-    # Sorting
-    valid_sort_fields = [
-        'UserId',
-        'PredictedItemDescription',
-        'Probability',
-        'PredictedItemCost',
-        'PredictedAt'  # ← Ensure this matches model field exactly
-    ]
+        # Sorting
     sort_by = request.GET.get('sort_by', '-confidence_score')
+    raw_sort_field = sort_by.lstrip('-')
+
+        # Field mapping with case normalization
+    valid_sort_fields = {
+            'user': 'user__UserId',
+            'user__userid': 'user__UserId',
+            'confidence_score': 'confidence_score',
+            'recommendation_type': 'recommendation_type',
+            'generation_date': 'generation_date',
+            'expiry_date': 'expiry_date'
+        }
+
+        # Normalize and validate the sort field
+    normalized_field = valid_sort_fields.get(raw_sort_field.lower(), 'confidence_score')
     sort_order = 'desc' if sort_by.startswith('-') else 'asc'
-    sort_field = sort_by.lstrip('-')
+    final_sort_by = f'-{normalized_field}' if sort_order == 'desc' else normalized_field
 
-    if sort_field not in valid_sort_fields:
-        sort_by = '-confidence_score'
-        sort_field = 'confidence_score'
-        sort_order = 'desc'
-
-    base_query = base_query.order_by(sort_by, '-generation_date')
+        # Apply sorting
+    base_query = base_query.order_by(final_sort_by, '-generation_date')
 
     # Handle CSV export
     if 'export' in request.GET:
@@ -335,7 +338,7 @@ def customer_recommendations(request):
     context = {
         'page_obj': page_obj,
         'filters': filters,
-        'sort_by': sort_field,
+        'sort_by': normalized_field,
         'sort_order': sort_order,
         'rec_types': NewCustomerRecommendation.RecommendationType.choices,
         'request': request

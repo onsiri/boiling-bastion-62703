@@ -4,20 +4,22 @@
 {% block content %}
     <h2>New Customer Prediction</h2>
 
-    <!-- Tabs Navigation -->
-    <ul class="nav nav-tabs mb-4" id="recommendationTabs">
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#recommendations-table">New Customer Recommendations</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#analytics-dashboard">Analytic Dashboard</a>
-        </li>
-    </ul>
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs mb-4" id="recommendationTabs">
+    <li class="nav-item">
+        <!-- Add 'active' class to this nav-link -->
+        <a class="nav-link active" data-bs-toggle="tab" href="#recommendations-table">New Customer Recommendations</a>
+    </li>
+    <li class="nav-item">
+        <!-- Remove 'active' class from this nav-link -->
+        <a class="nav-link" data-bs-toggle="tab" href="#analytics-dashboard">Analytic Dashboard</a>
+    </li>
+</ul>
 
-    <!-- Tab Content (Both panes inside the same container) -->
-    <div class="tab-content">
-        <!-- Recommendations Table Tab -->
-        <div class="tab-pane fade" id="recommendations-table">
+<!-- Tab Content -->
+<div class="tab-content">
+    <!-- Recommendations Table Tab - Add 'show active' -->
+    <div class="tab-pane fade show active" id="recommendations-table">
             <div id="recommendations-table-content"
                  hx-get="{% url 'ai_models:customer_recommendations' %}"
                  hx-trigger="load"
@@ -27,7 +29,7 @@
         </div>
 
         <!-- Analytics Dashboard Tab (Initially active) -->
-        <div class="tab-pane fade show active" id="analytics-dashboard">
+        <div class="tab-pane fade" id="analytics-dashboard">
             <script>
                 document.addEventListener("DOMContentLoaded", function() {
                     htmx.config.allowScripts = true;
