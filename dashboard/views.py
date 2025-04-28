@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.core import serializers
 import boto3
 from datetime import datetime
+from ai_models.views import logger
 from django_project import settings
 from django.shortcuts import render
 from plotly.offline import plot
@@ -18,6 +19,11 @@ from django.db.models.functions import TruncMonth
 from django.views.decorators.cache import cache_page
 import pandas as pd
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils.safestring import mark_safe
+import json
+
+import logging
+logger = logging.getLogger(__name__)
 
 def export_to_s3(request):
     # Serialize data
@@ -497,11 +503,18 @@ def personalization_view(request):
     context = get_personalization_context(request)
     return render(request, 'dashboard/personalization.html', context)
 
+
+def split_item_code(item_code):
+    """Clean parentheses and quotes from item codes"""
+    clean_code = item_code.strip(" ()'")  # Remove surrounding parentheses/quotes
+    return [part.strip(" '") for part in clean_code.split(',')]
+
 COUNTRY_COORDINATES = {
     # Existing entries
     'United Kingdom': (55.3781, -3.4360),
     'Germany': (51.1657, 10.4515),
     'France': (46.6035, 1.8883),
+    'Ireland': (53.4129, -8.2439),
     'EIRE': (53.1759, -8.1526),  # Ireland
     'Spain': (40.4637, -3.7492),
     'Netherlands': (52.1326, 5.2913),
@@ -510,10 +523,6 @@ COUNTRY_COORDINATES = {
     'Portugal': (39.3999, -8.2245),
     'Australia': (-25.2744, 133.7751)
 }
-def split_item_code(item_code):
-    """Clean parentheses and quotes from item codes"""
-    clean_code = item_code.strip(" ()'")  # Remove surrounding parentheses/quotes
-    return [part.strip(" '") for part in clean_code.split(',')]
 
 def get_new_customer_rec_context(request):
     context = {}
@@ -522,17 +531,19 @@ def get_new_customer_rec_context(request):
     # Existing metrics calculation
     total_recommendations = NewCustomerRecommendation.objects.count()
 
+    # Average confidence score
     avg_confidence = NewCustomerRecommendation.objects.aggregate(
         avg_confidence=Avg('confidence_score')
     )['avg_confidence'] or 0
-    avg_confidence_percent = round(avg_confidence, 1)
+    avg_confidence_percent = round(avg_confidence * 100, 1)
 
+    # Status counts
     status_counts = NewCustomerRecommendation.objects.aggregate(
         active=Count(
             Case(
                 When(
                     Q(expiry_date__gt=now) |
-                    Q(expiry_date__isnull=True, generation_date__gte=now - timedelta(days=30)),
+                    Q(expiry_date__isnull=True, generation_date__gte=now - timezone.timedelta(days=30)),
                     then=1
                 ),
                 output_field=IntegerField()
@@ -542,7 +553,7 @@ def get_new_customer_rec_context(request):
             Case(
                 When(
                     Q(expiry_date__lte=now) |
-                    Q(expiry_date__isnull=True, generation_date__lt=now - timedelta(days=30)),
+                    Q(expiry_date__isnull=True, generation_date__lt=now - timezone.timedelta(days=30)),
                     then=1
                 ),
                 output_field=IntegerField()
@@ -558,57 +569,78 @@ def get_new_customer_rec_context(request):
 
     item_info = {'code': None, 'name': None, 'count': 0}
     if most_recommended:
-        item_parts = most_recommended['item_code'].split(',')
-        item_info.update({
-            'code': item_parts[0].strip() if len(item_parts) >= 1 else most_recommended['item_code'],
-            'name': item_parts[1].strip() if len(item_parts) >= 2 else "Invalid format",
-            # Explicitly cast count to integer (safety check)
-            'count': int(most_recommended['count'])  # <--- Fix here
-        })
-    else:
-        item_info['count'] = 0  # Already int, but ensures consistency
+        try:
+            item_parts = most_recommended['item_code'].split(',', 1)
+            item_info = {
+                'code': item_parts[0].strip(),
+                'name': item_parts[1].strip() if len(item_parts) > 1 else "N/A",
+                'count': int(most_recommended['count'])
+            }
+        except (KeyError, ValueError, AttributeError) as e:
+            logger.error(f"Error processing most recommended item: {str(e)}")
 
-    # Geospatial Data
-    country_stats = (
-        CustomerDetail.objects
-        .filter(recommendations__isnull=False)
-        .values('country')
-        .annotate(total=Count('recommendations'))
-        .order_by('-total')[:10]  # Get top 10 countries
-    )
-
+    # Geospatial Data Processing
     geospatial_data = []
-    for stat in country_stats:
-        # Get country coordinates
-        lat, lng = COUNTRY_COORDINATES.get(stat['country'], (0, 0))
-
-        # Get top 5 items for this country
-        top_items = (
-            NewCustomerRecommendation.objects
-            .filter(user__country=stat['country'])
-            .values('item_code')
-            .annotate(count=Count('id'))
-            .order_by('-count')[:5]
+    try:
+        country_stats = (
+            CustomerDetail.objects
+            .filter(recommendations__isnull=False)
+            .exclude(country__isnull=True)
+            .values('country')
+            .annotate(total=Count('recommendations'))
+            .order_by('-total')[:10]
         )
 
-        # Process item codes
-        processed_items = []
-        for item in top_items:
-            parts = split_item_code(item['item_code'])
-            processed_items.append({
-                'code': parts[0] if len(parts) >= 1 else item['item_code'],
-                'name': parts[1] if len(parts) >= 2 else "Invalid format",
-                'count': item['count']
+        country_mapping = {
+            'EIRE': 'Ireland',
+            'UK': 'United Kingdom',
+            'Nederland': 'Netherlands'
+        }
+
+        for stat in country_stats:
+            original_country = stat['country']
+            country = country_mapping.get(original_country, original_country)
+            coordinates = COUNTRY_COORDINATES.get(country.title())
+
+            if not coordinates:
+                continue
+
+            # Get top items
+            top_items = (
+                NewCustomerRecommendation.objects
+                .filter(user__country=original_country)
+                .values('item_code')
+                .annotate(count=Count('id'))
+                .order_by('-count')[:5]
+            )
+
+            processed_items = []
+            for item in top_items:
+                try:
+                    code_part, name_part = item['item_code'].split(',', 1)
+                    processed_items.append({
+                        'code': code_part.strip(),
+                        'name': name_part.strip(),
+                        'count': item['count']
+                    })
+                except (ValueError, KeyError):
+                    processed_items.append({
+                        'code': item.get('item_code', 'N/A'),
+                        'name': 'Unknown Item',
+                        'count': item.get('count', 0)
+                    })
+
+            geospatial_data.append({
+                'country': original_country,
+                'latitude': float(coordinates[0]),
+                'longitude': float(coordinates[1]),
+                'total_recommendations': stat['total'],
+                'top_items': processed_items
             })
 
-        geospatial_data.append({
-            'country': stat['country'],
-            'latitude': lat,
-            'longitude': lng,
-            'total_recommendations': stat['total'],
-            'top_items': processed_items
-        })
-        print("Geospatial data sample:", geospatial_data[:2])  # Add this line
+    except Exception as e:
+        logger.error(f"Geospatial data error: {str(e)}")
+        geospatial_data = []
 
     context.update({
         'total_recommendations': total_recommendations,
@@ -618,14 +650,12 @@ def get_new_customer_rec_context(request):
         'most_recommended_code': item_info['code'],
         'most_recommended_name': item_info['name'],
         'most_recommended_count': item_info['count'],
-        'geospatial_data': geospatial_data,
-        'default_lat': 37.0902,
-        'default_lng': -95.7129
+        'geospatial_json': mark_safe(json.dumps(geospatial_data)),
+        'default_lat': 51.5074 if geospatial_data else 37.0902,
+        'default_lng': 0.1278 if geospatial_data else -95.7129
     })
 
     return context
-
-
 @cache_page(60 * 15, cache="default")
 def new_customer_rec_view(request):
     context = get_new_customer_rec_context(request)

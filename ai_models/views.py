@@ -113,6 +113,17 @@ def top_30_sale_forecast(request):
 
     return render(request, template_name, context)
 
+def generate_plot(figure):
+    figure.update_layout(
+        autosize=True,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    return figure.to_html(
+        full_html=False,
+        config={'responsive': True}
+    )
 
 def future_sale_prediction(request):
     # Filter parameters

@@ -61,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_plotly_dash.middleware.BaseMiddleware',
+    'accounts.middleware.RequireLoginMiddleware',
 ]
 
 ROOT_URLCONF = 'django_project.urls'
@@ -150,6 +151,7 @@ CSRF_TRUSTED_ORIGINS = [
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 # Login redirects
+LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 

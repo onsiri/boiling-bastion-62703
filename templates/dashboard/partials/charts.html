@@ -83,34 +83,39 @@
     </div>
 </form>
 <!-- Country Forecast Section -->
-<div class="row">  <!-- Add this row -->
+<div class="row">  <!-- Full-width row -->
     <div class="col-12">  <!-- Full-width column -->
         <div class="chart-container mb-4">
             <h4>Country Sales Forecast</h4>
             {% if country_plot %}
-                <div class="chart-wrapper" style="height: 400px">
-                    {{ country_plot|safe }}
+                <div class="chart-wrapper" style="height: 400px; width: 100%;">
+                    <div id="country-forecast-chart" class="plotly-chart">
+                        {{ country_plot|safe }}
+                    </div>
                 </div>
             {% else %}
-                <!-- No data message -->
+                <div class="alert alert-warning mt-3">No country forecast data available</div>
             {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Item Forecast Section -->
-<div class="row">  <!-- Add this row -->
+<div class="row">  <!-- Full-width row -->
     <div class="col-12">  <!-- Full-width column -->
         <div class="chart-container mb-4">
             <h4>Item Sales Forecast</h4>
             {% if item_plot %}
-                <div class="chart-wrapper" style="height: 400px">
-                    {{ item_plot|safe }}
+                <div class="chart-wrapper" style="height: 400px; width: 100%;">
+                    <div id="item-forecast-chart" class="plotly-chart">
+                        {{ item_plot|safe }}
+                    </div>
                 </div>
             {% else %}
-                <!-- No data message -->
+                <div class="alert alert-warning mt-3">No item forecast data available</div>
             {% endif %}
         </div>
     </div>
 </div>
+
 

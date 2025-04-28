@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 {% extends "base.html" %}
+
 {% block content %}
 <h2>Sales Forecast Dashboard</h2>
 
@@ -27,74 +28,122 @@
         </div>
     </div>
 </div>
+    <style>
+    /* Nuclear CSS Reset for Charts */
+    .plotly-chart-container {
+        width: 100% !important;
+        height: 100% !important;
+        position: relative !important;
+        min-width: 100% !important;
+        overflow: visible !important;
+    }
 
-<!-- Required Scripts -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    .js-plotly-plot .plot-container {
+        width: 100% !important;
+        height: 100% !important;
+        position: static !important;
+        inset: 0 !important;
+        transform: none !important;
+    }
 
-<style>
-    /* Ensure charts take full container width */
     .chart-wrapper {
         width: 100% !important;
-        position: relative;
+        min-height: 400px;
+        contain: none !important;
+        overflow: visible !important;
     }
-    .plot-container {
-        width: 100% !important;
+
+    /* Force Bootstrap Columns */
+    .col-12[class*="chart-container"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
 </style>
 
 <script>
-    // Initialize all Plotly charts
-    function initPlots() {
-        // Target all plot containers
-        const plotContainers = [
-            'country-pie-plot',
-            'item-pie-plot',
-            'country-forecast-plot',
-            'item-forecast-plot'
-        ];
+    // Ultimate Chart Resizing Solution
+    (function() {
+        let resizeTimeout;
+        const chartIds = ['country-forecast-chart', 'item-forecast-chart'];
 
-        plotContainers.forEach(id => {
-            const element = document.getElementById(id);
-            if (element && typeof Plotly !== 'undefined') {
-                // Purge existing plot
-                Plotly.purge(element);
+        function enforceFullWidth() {
+            chartIds.forEach(id => {
+                const container = document.getElementById(id);
+                if (!container) return;
 
-                // Get dimensions from parent container
-                const parent = element.closest('.chart-wrapper');
-                const width = parent ? parent.offsetWidth : element.offsetWidth;
-                const height = parent ? parent.offsetHeight : element.offsetHeight;
+                // 1. Find the actual chart element
+                const plotDiv = container.querySelector('.js-plotly-plot') || container;
 
-                // Set explicit dimensions
-                element.style.width = width + 'px';
-                element.style.height = height + 'px';
+                // 2. Calculate available width
+                const parentWidth = container.closest('.col-12')?.offsetWidth ||
+                                  container.closest('.chart-wrapper')?.offsetWidth ||
+                                  document.body.offsetWidth;
 
-                // Reinitialize plot with responsive config
-                const data = JSON.parse(element.dataset.plot);
-                Plotly.newPlot(element, data, {}, {
-                    responsive: true,
-                    displayModeBar: false
+                // 3. Apply dimensions directly
+                plotDiv.style.width = parentWidth + 'px';
+                plotDiv.style.height = '400px';
+                plotDiv.style.minWidth = '100%';
+
+                // 4. Update Plotly layout
+                if (typeof Plotly !== 'undefined') {
+                    Plotly.relayout(plotDiv, {
+                        width: parentWidth,
+                        height: 400,
+                        autosize: false
+                    });
+                }
+            });
+        }
+
+        // Initialize with delays
+        function initializeCharts() {
+            enforceFullWidth();
+            setTimeout(enforceFullWidth, 100);
+            setTimeout(enforceFullWidth, 500);
+        }
+
+        // Setup event listeners
+        function setupListeners() {
+            // Core events
+            ['DOMContentLoaded', 'htmx:afterSwap'].forEach(event => {
+                window.addEventListener(event, () => {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(initializeCharts, 300);
                 });
-            }
-        });
-    }
+            });
 
-    // Resize handler
-    function handleResize() {
-        Plotly.Plots.resize(document.getElementById('country-forecast-plot'));
-        Plotly.Plots.resize(document.getElementById('item-forecast-plot'));
-    }
+            // Continuous monitoring
+            const resizeObserver = new ResizeObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.contentRect.width > 0) {
+                        enforceFullWidth();
+                    }
+                });
+            });
 
-    // Initial load
-    document.addEventListener('DOMContentLoaded', () => {
-        initPlots();
-        window.addEventListener('resize', handleResize);
-    });
+            // Observe all chart containers
+            chartIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) resizeObserver.observe(el);
+            });
 
-    // HTMX content swap handler
-    document.addEventListener('htmx:afterSwap', () => {
-        setTimeout(initPlots, 100);
-    });
+            // Window resize fallback
+            window.addEventListener('resize', () => {
+                enforceFullWidth();
+                setTimeout(enforceFullWidth, 50);
+            });
+        }
+
+        // Start the party
+        document.readyState === 'complete' ? setupListeners() : window.addEventListener('load', setupListeners);
+    })();
 </script>
+
+<!-- Existing script includes -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
 {% endblock %}

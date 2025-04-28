@@ -2,96 +2,129 @@
 {% load static %}
 
 {% block content %}
-    <h2>New Customer Prediction</h2>
+    <h2>Customer Recommendation</h2>
 
-<!-- Tabs Navigation -->
-<ul class="nav nav-tabs mb-4" id="recommendationTabs">
-    <li class="nav-item">
-        <!-- Add 'active' class to this nav-link -->
-        <a class="nav-link active" data-bs-toggle="tab" href="#recommendations-table">New Customer Recommendations</a>
-    </li>
-    <li class="nav-item">
-        <!-- Remove 'active' class from this nav-link -->
-        <a class="nav-link" data-bs-toggle="tab" href="#analytics-dashboard">Analytic Dashboard</a>
-    </li>
-</ul>
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="personalizationTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#purchase-probability">Customer Purchase Probability</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#recommendation-dashboard">Analytic Dashboard</a>
+        </li>
+    </ul>
 
-<!-- Tab Content -->
-<div class="tab-content">
-    <!-- Recommendations Table Tab - Add 'show active' -->
-    <div class="tab-pane fade show active" id="recommendations-table">
-            <div id="recommendations-table-content"
-                 hx-get="{% url 'ai_models:customer_recommendations' %}"
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Purchase Probability Tab -->
+        <div class="tab-pane fade show active" id="purchase-probability">
+            <div id="future-sale-content"
+                 hx-get="{% url 'ai_models:future_sale_prediction' %}?main_container=1"
                  hx-trigger="load"
                  hx-swap="innerHTML">
-                <div class="text-center">Loading...</div>
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Analytics Dashboard Tab (Initially active) -->
-        <div class="tab-pane fade" id="analytics-dashboard">
-            <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    htmx.config.allowScripts = true;
-                });
-            </script>
-
-            <div id="main-content">
-                {% include "dashboard/partials/coldstart_main_content.html" %}
+        <!-- Recommendation Dashboard Tab -->
+        <div class="tab-pane fade" id="recommendation-dashboard">
+            <!-- Summary Cards -->
+            <div class="container">
+                {% include "dashboard/partials/coldstart_summary_cards.html" %}
             </div>
 
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <!-- Map Section -->
+            <div class="container mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Geospatial Analysis</h5>
+                    </div>
+                    <div class="card-body p-0" style="height: 600px;">
+                        <div id="trendingMap"></div>
+                    </div>
+                </div>
+            </div>
+
+            {{ geospatial_json|json_script:"geospatial-data" }}
         </div>
     </div>
 
-    <!-- Include scripts -->
+    <!-- Required Scripts -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
-    <!-- Scripts for charts and HTMX (remain unchanged) -->
     <script>
-    // Initialize charts
-    function initCharts() {
-        // Add chart initialization logic here if needed
-        ['geo-plot', 'trending-plot'].forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                Plotly.Plots.resize(element);
+    document.addEventListener('DOMContentLoaded', function() {
+        let map = null;
+        const geoData = JSON.parse(document.getElementById('geospatial-data').textContent);
+        const defaultCoordinates = [{{ default_lat }}, {{ default_lng }}];
+
+        function initMap() {
+            // Cleanup existing map
+            if (map) map.remove();
+
+            map = L.map('trendingMap', {
+                center: defaultCoordinates,
+                zoom: 3,
+                attributionControl: false
+            });
+
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18
+            }).addTo(map);
+
+            // Add markers if data exists
+            if (geoData.length > 0) {
+                const markers = L.markerClusterGroup();
+
+                geoData.forEach(location => {
+                    const marker = L.marker([location.latitude, location.longitude])
+                        .bindPopup(`
+                            <div class="map-popup">
+                                <h6>\${location.total_recommendations} Recommendations</h6>
+                                <p><strong>Country:</strong> \${location.country}</p>
+                                \${location.top_items.length > 0 ?
+                                    `<ol>\${location.top_items.map(item =>
+                                        `<li>\${item.name} (\${item.count})</li>`
+                                    ).join('')}</ol>` :
+                                    '<p>No items available</p>'}
+                            </div>
+                        `);
+                    markers.addLayer(marker);
+                });
+
+                map.addLayer(markers);
+                map.fitBounds(markers.getBounds());
+            } else {
+                document.getElementById('trendingMap').innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        No geospatial data available
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize map when tab is shown
+        document.getElementById('personalizationTabs').addEventListener('shown.bs.tab', function(e) {
+            if (e.target.hash === '#recommendation-dashboard') {
+                setTimeout(initMap, 100); // Allow tab transition to complete
             }
         });
-    }
 
-    // Auto-resize handler
-    function initResize(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const observer = new ResizeObserver(() => {
-            Plotly.Plots.resize(container);
-        });
-
-        observer.observe(container);
-    }
-
-    // Initial load
-    document.addEventListener('DOMContentLoaded', function() {
-        initCharts();
-        ['geo-plot', 'trending-plot'].forEach(initResize);
-    });
-
-    // HTMX content swap handler
-    document.addEventListener('htmx:afterSwap', function() {
-        setTimeout(() => {
-            initCharts();
-            ['geo-plot', 'trending-plot'].forEach(initResize);
-        }, 50);
-    });
-
-    // Window resize handler
-    window.addEventListener('resize', function() {
-        ['geo-plot', 'trending-plot'].forEach(id => {
-            Plotly.Plots.resize(document.getElementById(id));
-        });
+        // Initialize if already on dashboard tab
+        if (document.querySelector('#recommendation-dashboard.active')) {
+            initMap();
+        }
     });
     </script>
 {% endblock %}
