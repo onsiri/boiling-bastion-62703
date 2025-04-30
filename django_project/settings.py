@@ -144,7 +144,7 @@ if not DEBUG:
 
 CSRF_TRUSTED_ORIGINS = [
     'https://boiling-bastion-62703-1fb7e4016adf.herokuapp.com',
-    'http://localhost:8000'
+    'http://localhost:8000',
     'https://app.insightsds.com',
 ]
 
