@@ -1,7 +1,5 @@
 from django.db import models
-from django.http import request
 from django.urls import reverse
-from django.shortcuts import render
 
 
 

@@ -1,9 +1,85 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h1>New Ticket</h1>
-<form action="" method="post">{% csrf_token %}
-  {{ form.as_p }}
-  <input type="submit" value="Save">
-</form>
-{% endblock content %}
+
+<div class="container mt-5">
+    <h1 class="mb-4">New Ticket</h1>
+
+    <form method="post" class="form-horizontal">
+        {% csrf_token %}
+
+        <!-- Title Field -->
+        <div class="row gx-2 align-items-center mb-2">
+            <div class="col-sm-3">
+                <label for="id_title" class="form-label mb-0">Title:</label>  <!-- Added mb-0 -->
+            </div>
+            <div class="col-sm-6">
+                {{ form.title }}
+            </div>
+        </div>
+
+        <!-- Author Field -->
+        <div class="row gx-2 align-items-center mb-2">
+            <div class="col-sm-3">
+                <label for="id_author" class="form-label mb-0">Author:</label>  <!-- Added mb-0 -->
+            </div>
+            <div class="col-sm-6">
+                {{ form.author }}
+            </div>
+        </div>
+
+        <!-- Body Field -->
+        <div class="row gx-2 align-items-center mb-2">
+            <div class="col-sm-3">
+                <label for="id_body" class="form-label mb-0">Message:</label>  <!-- Added mb-0 -->
+            </div>
+            <div class="col-sm-9">
+                {{ form.body }}
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="row mt-4">
+            <div class="col-sm-9 offset-sm-3">
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+    /* Custom spacing adjustments */
+    .row.gx-2 {
+        --bs-gutter-x: 0.85rem;  /* Reduced horizontal gutter */
+    }
+
+    .form-control {
+        width: 100%;
+        max-width: 500px;
+        margin-left: -0.85rem;  /* Pull input closer to label */
+    }
+
+    textarea.form-control {
+        height: 150px;
+        min-width: 100%;
+    }
+
+    .form-label {
+        padding-right: 0.1rem;  /* Add minimal space between label and input */
+    }
+
+    @media (max-width: 768px) {
+        .col-sm-3, .col-sm-6, .col-sm-9 {
+            width: 100%;
+            max-width: 100%;
+        }
+        .form-control {
+            margin-left: 0;
+            max-width: 100%;
+        }
+        .offset-sm-3 {
+            margin-left: 0;
+        }
+    }
+</style>
+
+{% endblock %}

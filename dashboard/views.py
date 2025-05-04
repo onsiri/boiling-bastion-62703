@@ -16,7 +16,7 @@ import plotly.graph_objects as pgo
 from ai_models.models import CountrySaleForecast, ItemSaleForecast, NextItemPrediction, sale_forecast, NewCustomerRecommendation, CustomerDetail
 from django.db.models import Sum, Max, Q, Subquery, OuterRef, F, ExpressionWrapper, DecimalField, Avg, Count
 from django.db.models.functions import TruncMonth
-from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import cache_page, never_cache
 import pandas as pd
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils.safestring import mark_safe
@@ -584,8 +584,9 @@ def get_new_customer_rec_context(request):
     try:
         country_stats = (
             CustomerDetail.objects
-            .filter(recommendations__isnull=False)
             .exclude(country__isnull=True)
+            .annotate(recommendation_count=Count('recommendations'))
+            .filter(recommendation_count__gt=0)
             .values('country')
             .annotate(total=Count('recommendations'))
             .order_by('-total')[:10]
@@ -600,7 +601,7 @@ def get_new_customer_rec_context(request):
         for stat in country_stats:
             original_country = stat['country']
             country = country_mapping.get(original_country, original_country)
-            coordinates = COUNTRY_COORDINATES.get(country.title())
+            coordinates = COUNTRY_COORDINATES.get(country.title()) or (0, 0)
 
             if not coordinates:
                 continue
@@ -608,7 +609,7 @@ def get_new_customer_rec_context(request):
             # Get top items
             top_items = (
                 NewCustomerRecommendation.objects
-                .filter(user__country=original_country)
+                .filter(user__country=original_country)  # Already correct - uses FK relation
                 .values('item_code')
                 .annotate(count=Count('id'))
                 .order_by('-count')[:5]
@@ -650,13 +651,13 @@ def get_new_customer_rec_context(request):
         'most_recommended_code': item_info['code'],
         'most_recommended_name': item_info['name'],
         'most_recommended_count': item_info['count'],
-        'geospatial_json': mark_safe(json.dumps(geospatial_data)),
+        'geospatial_data': geospatial_data,  # Remove json.dumps() and mark_safe
         'default_lat': 51.5074 if geospatial_data else 37.0902,
         'default_lng': 0.1278 if geospatial_data else -95.7129
     })
 
     return context
-@cache_page(60 * 15, cache="default")
+@never_cache
 def new_customer_rec_view(request):
     context = get_new_customer_rec_context(request)
     return render(request, 'dashboard/new_customer_rec.html', context)

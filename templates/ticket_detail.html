@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hi, {{ object.author }}.</h1>
+    <h1>Thank you for Contacting us. Below are the detail of your ticket:</h1>
+<h2>Ticket Title: {{ object.title }}</h2>
+<div>Ticket Detail:{{ object.body }}</div>
+{% endblock %}

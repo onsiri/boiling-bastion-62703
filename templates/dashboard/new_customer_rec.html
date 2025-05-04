@@ -49,7 +49,7 @@
                 </div>
             </div>
 
-            {{ geospatial_json|json_script:"geospatial-data" }}
+            {{ geospatial_data|json_script:"geospatial-data" }}
         </div>
     </div>
 
@@ -69,50 +69,65 @@
         const defaultCoordinates = [{{ default_lat }}, {{ default_lng }}];
 
         function initMap() {
-            // Cleanup existing map
-            if (map) map.remove();
+    // Cleanup existing map
+    if (map) {
+        map.remove();
+        map = null;
+    }
 
-            map = L.map('trendingMap', {
-                center: defaultCoordinates,
-                zoom: 3,
-                attributionControl: false
+    const container = document.getElementById('trendingMap');
+    if (!container) {
+        console.error('Map container not found');
+        return;
+    }
+
+    // Clear any existing error messages
+    container.innerHTML = '';
+
+    try {
+        map = L.map('trendingMap', {
+            center: defaultCoordinates,
+            zoom: geoData.length > 0 ? 3 : 1,
+            attributionControl: false
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18
+        }).addTo(map);
+
+        if (geoData.length > 0) {
+            const markers = L.markerClusterGroup();
+
+            geoData.forEach(location => {
+                // Validate coordinates
+                if (!location.latitude || !location.longitude) {
+                    console.warn('Invalid coordinates for:', location.country);
+                    return;
+                }
+
+                const marker = L.marker([location.latitude, location.longitude])
+                    .bindPopup(`...`);
+                markers.addLayer(marker);
             });
 
-            // Add tile layer
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 18
-            }).addTo(map);
-
-            // Add markers if data exists
-            if (geoData.length > 0) {
-                const markers = L.markerClusterGroup();
-
-                geoData.forEach(location => {
-                    const marker = L.marker([location.latitude, location.longitude])
-                        .bindPopup(`
-                            <div class="map-popup">
-                                <h6>\${location.total_recommendations} Recommendations</h6>
-                                <p><strong>Country:</strong> \${location.country}</p>
-                                \${location.top_items.length > 0 ?
-                                    `<ol>\${location.top_items.map(item =>
-                                        `<li>\${item.name} (\${item.count})</li>`
-                                    ).join('')}</ol>` :
-                                    '<p>No items available</p>'}
-                            </div>
-                        `);
-                    markers.addLayer(marker);
-                });
-
-                map.addLayer(markers);
-                map.fitBounds(markers.getBounds());
-            } else {
-                document.getElementById('trendingMap').innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        No geospatial data available
-                    </div>
-                `;
-            }
+            map.addLayer(markers);
+            map.fitBounds(markers.getBounds());
+        } else {
+            container.innerHTML = `
+                <div class="alert alert-warning m-3">
+                    No geospatial data available
+                </div>
+            `;
         }
+    } catch (error) {
+        console.error('Map initialization error:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger m-3">
+                Error initializing map: \\${error.message}
+            </div>
+        `;
+    }
+}
 
         // Initialize map when tab is shown
         document.getElementById('personalizationTabs').addEventListener('shown.bs.tab', function(e) {

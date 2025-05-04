@@ -1,8 +1,7 @@
-from django.shortcuts import render
-
-from django.views.generic import TemplateView, CreateView
+from django.views.generic import TemplateView, CreateView, DetailView
 from .models import Ticket
-
+from .forms import TicketForm
+from django.urls import reverse_lazy
 class HomePageView(TemplateView):
     template_name = "home.html"
 
@@ -15,6 +14,11 @@ class AboutPageView(TemplateView):
         context["phone_number"] = "555-555-5555"
         return context
 class BlogCreateView(CreateView):  # new
-    model = Ticket
+    form_class = TicketForm  # Use your custom form
     template_name = "contact_us.html"
-    fields = ["title", "author", "body"]
+    def get_success_url(self):
+        return reverse_lazy('ticket_detail', kwargs={'pk': self.object.pk})
+
+class TicketDetailView(DetailView):
+    model = Ticket
+    template_name = "ticket_detail.html"
