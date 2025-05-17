@@ -1,4 +1,85 @@
 {% extends "base.html" %}
 {% block content %}
- <p></p>
+<div class="llm-interface" style="max-width: 800px; margin: 2rem auto; padding: 20px;">
+    <h2 style="margin-bottom: 1.5rem;">DSInsights AI Assistant</h2>
+
+    <!-- Prompt Input Form -->
+    <form id="promptForm" style="margin-bottom: 1.5rem;">
+        {% csrf_token %}
+        <div style="margin-bottom: 1rem;">
+            <textarea
+                id="promptInput"
+                name="prompt"
+                rows="4"
+                placeholder="Ask me about sales forecasts, customer insights, or item recommendations..."
+                style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; resize: vertical;"
+            ></textarea>
+        </div>
+        <button
+            type="submit"
+            style="padding: 10px 25px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;"
+        >
+            Ask DSInsights
+        </button>
+    </form>
+
+    <!-- Response Container -->
+    <div id="responseContainer" style="display: none; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+        <div id="loading" style="display: none; color: #666; margin-bottom: 1rem;">
+            Analyzing your request... <span class="loading-dots">.</span>
+        </div>
+        <div id="aiResponse" style="white-space: pre-wrap; line-height: 1.6;"></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('promptForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const promptInput = document.getElementById('promptInput');
+    const responseContainer = document.getElementById('responseContainer');
+    const loading = document.getElementById('loading');
+    const aiResponse = document.getElementById('aiResponse');
+
+    // Show loading and response container
+    responseContainer.style.display = 'block';
+    loading.style.display = 'block';
+    aiResponse.textContent = '';
+
+    try {
+        const response = await fetch('/models/ask/', {  // Keep this as RELATIVE URL
+            method: 'POST',
+            body: new URLSearchParams({
+                'prompt': promptInput.value,
+                'csrfmiddlewaretoken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        // Handle HTTP errors
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: \${response.status}`);
+        }
+
+        const jsonData = await response.json();
+        aiResponse.textContent = jsonData.response;
+
+    } catch (error) {
+        aiResponse.textContent = `Error: \${error.message}`;
+        console.error('Error:', error);
+    } finally {
+        loading.style.display = 'none';
+    }
+});
+
+</script>
+
+<style>
+    .loading-dots {
+        display: inline-block;
+        width: 20px;
+        text-align: left;
+    }
+</style>
 {% endblock content %}

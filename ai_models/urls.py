@@ -11,6 +11,7 @@ urlpatterns = [
     path('generate-recommendations/', views.generate_recommendations, name='generate_recommendations'),
     path('check-task-status/', views.check_task_status, name='check_task_status'),
     path('new-customer-recommendations/', views.customer_recommendations, name='customer_recommendations'),
+    path('ask/', views.ask_ai, name='ask_ai'),
 ]
 
 

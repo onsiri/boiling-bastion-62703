@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-
+from django.db.models import Sum
 from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation
 from django.db.models import F, OuterRef, Subquery, Max
 from datetime import datetime, timedelta
@@ -19,8 +19,53 @@ from celery.result import AsyncResult
 import logging
 logger = logging.getLogger(__name__)
 from django.db.models import Min, Max
-from django.utils.dateparse import parse_date
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .llm_utils import query_openai, detect_forecast_intent, detect_recommendation_intent
+import re
 
+
+@require_POST
+@require_POST
+def ask_ai(request):
+    try:
+        prompt = request.POST.get('prompt', '').strip()
+        response = ""
+
+        # 1. Check for sales forecast intent
+        forecast_intent = detect_forecast_intent(prompt)
+        if forecast_intent.get('needs_forecast') and forecast_intent['confidence'] > 0.7:
+        # ... existing forecast handling code ...
+
+        # 2. Check for product recommendation intent
+            recommendation_intent = detect_recommendation_intent(prompt)
+            if recommendation_intent.get('needs_recommendation') and recommendation_intent['confidence'] > 0.6:
+                product_name = recommendation_intent['product_name']
+                recommendations = NextItemPrediction.objects.filter(
+                PredictedItemDescription__iexact=product_name
+                ).order_by('-Probability')[:10]  # Get top 10
+
+                if recommendations.exists():
+                    customer_list = "\n".join(
+                        [f"- User {rec.UserId} ({rec.Probability * 100:.1f}% probability)"
+                         for rec in recommendations]
+                    )
+                    response = f"Customers most likely to purchase {product_name}:\n{customer_list}"
+                else:
+                    response = f"No prediction data available for {product_name}"
+
+            return JsonResponse({'response': response})
+
+        # 3. Fallback to general AI
+        ai_response = query_openai(prompt)
+        response = ai_response if "API Error" not in ai_response else \
+            "Currently unavailable. Please try again later."
+
+        return JsonResponse({'response': response})
+
+    except Exception as e:
+        logger.error(f"Server Error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 def top_30_sale_forecast(request):
     active_tab = request.GET.get('active_tab', 'top30-forecast')
     # Calculate date range (tomorrow + 30 days)
