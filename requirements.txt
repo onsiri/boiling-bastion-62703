@@ -117,4 +117,3 @@ xlrd==2.0.1
 zipp==3.21.0
 sqlalchemy==1.4.42
 openai~=1.79.0
-python-dotenv==1.0.0
