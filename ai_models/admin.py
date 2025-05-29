@@ -9,6 +9,7 @@ from .utils import generate_forecast, predict_future_sales, import_forecasts_fro
 import numpy as np
 from .tasks import async_upload_object_db, async_predict_future_sales
 
+
 class BulkActionMixin:
     # Bulk delete configuration
     show_delete_all = True

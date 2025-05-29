@@ -40,7 +40,7 @@ def generate_strategic_recommendations():
 
             if top_new_customers.exists():
                 rec = "1. Target high-potential new customers:\n" + "\n".join(
-                    [f"- {c.UserId} (Income: ${c.income}, {c.age}y/o {c.gender} in {c.country})"
+                    [f"- (Customer ID: {c.UserId} , Income: ${c.income}, {c.age}y/o {c.gender} in {c.country})"
                      for c in top_new_customers]
                 )
                 recommendations.append(rec)
@@ -57,20 +57,36 @@ def generate_strategic_recommendations():
             ).order_by('-total_prob')[:5]
 
             for product in top_product_predictions:
-                customers = NextItemPrediction.objects.filter(
+                # Get user details through separate query
+                user_ids = NextItemPrediction.objects.filter(
                     PredictedItemCode=product['PredictedItemCode']
-                ).values(
-                    'UserId', 'Probability', 'user__country'
+                ).values_list('UserId', flat=True).distinct()[:5]
+
+                customers = CustomerDetail.objects.filter(
+                    UserId__in=user_ids
+                ).values('UserId', 'country')
+
+                # Create mapping of UserId to country
+                country_map = {c['UserId']: c['country'] for c in customers}
+
+                # Get top predictions with probability
+                predictions = NextItemPrediction.objects.filter(
+                    PredictedItemCode=product['PredictedItemCode'],
+                    UserId__in=user_ids
                 ).order_by('-Probability')[:5]
 
-                if customers:
-                    customer_list = "\n".join(
-                        [
-                            f"- {c['UserId']} ({c['Probability'] * 100:.1f}% likely) in {c.get('user__country', 'unknown')}"
-                            for c in customers]
+                customer_list = []
+                for p in predictions:
+                    country = country_map.get(p.UserId, 'unknown')
+                    customer_list.append(
+                        f"- Customer ID: {p.UserId} ({p.Probability * 100:.1f}% likely) in {country}"
                     )
-                    rec = f"2. Promote {product['PredictedItemDescription']} (SKU: {product['PredictedItemCode']}) to:\n{customer_list}"
+
+                if customer_list:
+                    rec = f"2. Promote {product['PredictedItemDescription']} (SKU: {product['PredictedItemCode']}) to:\n" + "\n".join(
+                        customer_list)
                     recommendations.append(rec)
+
         except Exception as e:
             logger.error(f"Product recommendations failed: {str(e)}")
 
@@ -84,7 +100,7 @@ def generate_strategic_recommendations():
             if frequent_buyers.exists():
                 rec = "3. Focus on high-value customers for upselling:\n" + "\n".join(
                     [
-                        f"- User {b['user__UserId']} (Spent \${b['total_spent']:.2f} across {b['transaction_count']} purchases)"
+                        f"- Customer ID {b['user__UserId']} (Spent ${b['total_spent']:.2f} across {b['transaction_count']} purchases)"
                         for b in frequent_buyers]
                 )
                 recommendations.append(rec)
@@ -122,7 +138,7 @@ def ask_ai(request):
         # 1. First check strategic business questions
         strategic_intent = detect_strategic_intent(prompt)
         print(f"Strategic Intent RAW Output: {strategic_intent}")
-        if strategic_intent.get('needs_strategy') and strategic_intent['confidence'] > 0.05:  # Lowered threshold
+        if strategic_intent.get('needs_strategy') and strategic_intent['confidence'] > 0.7:  # Lowered threshold
             recommendations = generate_strategic_recommendations()
             if recommendations:
                 # Add data-backed metrics to recommendations
