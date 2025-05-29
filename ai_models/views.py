@@ -1,8 +1,9 @@
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Sum
-from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation
+from django.db.models import F, Sum, FloatField, IntegerField, Count
+from django.db.models.functions import Cast, Substr, Trim
+from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation, Transaction, CustomerDetail, CountrySaleForecast
 from django.db.models import F, OuterRef, Subquery, Max
 from datetime import datetime, timedelta
 from django.core.exceptions import FieldError
@@ -21,42 +22,181 @@ logger = logging.getLogger(__name__)
 from django.db.models import Min, Max
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .llm_utils import query_openai, detect_forecast_intent, detect_recommendation_intent
+from .llm_utils import query_openai, detect_forecast_intent, detect_recommendation_intent, detect_strategic_intent
 import re
 
 
+def generate_strategic_recommendations():
+    """Generate data-driven recommendations using all available models"""
+    recommendations = []
+
+    try:
+        # 1. New customer opportunities
+        try:
+            top_new_customers = CustomerDetail.objects.filter(
+                existing_customer=False,
+                income__gt=50000
+            ).order_by('-income')[:10]
+
+            if top_new_customers.exists():
+                rec = "1. Target high-potential new customers:\n" + "\n".join(
+                    [f"- {c.UserId} (Income: ${c.income}, {c.age}y/o {c.gender} in {c.country})"
+                     for c in top_new_customers]
+                )
+                recommendations.append(rec)
+        except Exception as e:
+            logger.error(f"New customers recommendation failed: {str(e)}")
+
+        # 2. Product recommendations from NextItemPrediction (FIXED)
+        try:
+            top_product_predictions = NextItemPrediction.objects.values(
+                'PredictedItemDescription', 'PredictedItemCode'
+            ).annotate(
+                total_prob=Sum('Probability'),
+                customer_count=Count('UserId')
+            ).order_by('-total_prob')[:5]
+
+            for product in top_product_predictions:
+                customers = NextItemPrediction.objects.filter(
+                    PredictedItemCode=product['PredictedItemCode']
+                ).values(
+                    'UserId', 'Probability', 'user__country'
+                ).order_by('-Probability')[:5]
+
+                if customers:
+                    customer_list = "\n".join(
+                        [
+                            f"- {c['UserId']} ({c['Probability'] * 100:.1f}% likely) in {c.get('user__country', 'unknown')}"
+                            for c in customers]
+                    )
+                    rec = f"2. Promote {product['PredictedItemDescription']} (SKU: {product['PredictedItemCode']}) to:\n{customer_list}"
+                    recommendations.append(rec)
+        except Exception as e:
+            logger.error(f"Product recommendations failed: {str(e)}")
+
+        # 3. Upsell opportunities from transaction history
+        try:
+            frequent_buyers = Transaction.objects.values('user__UserId').annotate(
+                total_spent=Sum(F('NumberOfItemsPurchased') * F('CostPerItem')),
+                transaction_count=Count('TransactionId')
+            ).order_by('-total_spent')[:5]
+
+            if frequent_buyers.exists():
+                rec = "3. Focus on high-value customers for upselling:\n" + "\n".join(
+                    [
+                        f"- User {b['user__UserId']} (Spent \${b['total_spent']:.2f} across {b['transaction_count']} purchases)"
+                        for b in frequent_buyers]
+                )
+                recommendations.append(rec)
+        except Exception as e:
+            logger.error(f"Upsell recommendations failed: {str(e)}")
+
+        # 4. Forecast-based recommendations
+        try:
+            current_year = datetime.now().year
+            country_forecasts = CountrySaleForecast.objects.filter(
+                ds__year=current_year + 1
+            ).order_by('-prediction')[:3]
+
+            if country_forecasts.exists():
+                rec = "4. Expand in high-potential markets:\n" + "\n".join(
+                    [f"- {f.group} (Projected sales: \${f.prediction:,.0f})"
+                     for f in country_forecasts]
+                )
+                recommendations.append(rec)
+        except Exception as e:
+            logger.error(f"Forecast recommendations failed: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"General recommendation error: {str(e)}", exc_info=True)
+        return ["Recommendation system is currently unavailable"]
+
+    return recommendations if recommendations else ["No specific recommendations found in current data"]
 @require_POST
 @require_POST
 def ask_ai(request):
     try:
-        prompt = request.POST.get('prompt', '').strip()
+        prompt = request.POST.get('prompt', '').strip().lower()  # Add .lower()
         response = ""
 
-        # 1. Check for sales forecast intent
-        forecast_intent = detect_forecast_intent(prompt)
-        if forecast_intent.get('needs_forecast') and forecast_intent['confidence'] > 0.7:
-        # ... existing forecast handling code ...
-
-        # 2. Check for product recommendation intent
-            recommendation_intent = detect_recommendation_intent(prompt)
-            if recommendation_intent.get('needs_recommendation') and recommendation_intent['confidence'] > 0.6:
-                product_name = recommendation_intent['product_name']
-                recommendations = NextItemPrediction.objects.filter(
-                PredictedItemDescription__iexact=product_name
-                ).order_by('-Probability')[:10]  # Get top 10
-
-                if recommendations.exists():
-                    customer_list = "\n".join(
-                        [f"- User {rec.UserId} ({rec.Probability * 100:.1f}% probability)"
-                         for rec in recommendations]
-                    )
-                    response = f"Customers most likely to purchase {product_name}:\n{customer_list}"
-                else:
-                    response = f"No prediction data available for {product_name}"
-
+        # 1. First check strategic business questions
+        strategic_intent = detect_strategic_intent(prompt)
+        print(f"Strategic Intent RAW Output: {strategic_intent}")
+        if strategic_intent.get('needs_strategy') and strategic_intent['confidence'] > 0.05:  # Lowered threshold
+            recommendations = generate_strategic_recommendations()
+            if recommendations:
+                # Add data-backed metrics to recommendations
+                response = "Data-Driven Recommendations:\n\n" + "\n\n".join([
+                    f"{rec}\n(Confidence: {min(strategic_intent['confidence'] * 100, 95):.1f}%)"
+                    for rec in recommendations
+                ])
+            else:
+                # Fallback to model-based suggestions if no data patterns
+                response = "Current data suggests focusing on:\n" + \
+                           "1. Customer retention strategies\n" + \
+                           "2. High-margin product bundles\n" + \
+                           "3. Seasonal demand forecasting"
             return JsonResponse({'response': response})
 
-        # 3. Fallback to general AI
+        # 2. Handle sales/forecast requests
+        forecast_intent = detect_forecast_intent(prompt)
+        if forecast_intent.get('needs_forecast') and forecast_intent['confidence'] > 0.7:
+            try:
+                year = int(forecast_intent.get('year', 2025))
+            except (TypeError, ValueError):
+                return JsonResponse({'response': "Please specify a valid year"})
+
+            if year < 2025:
+                # Handle historical sales from Transaction data
+                transactions = Transaction.objects.annotate(
+                    transaction_year=Cast(
+                        Substr('TransactionTime', 1, 4),  # Direct year extraction
+                        output_field=IntegerField()
+                    )
+                ).filter(transaction_year=year)
+
+                total = transactions.aggregate(
+                    total_revenue=Sum(
+                        F('NumberOfItemsPurchased') * F('CostPerItem'),
+                        output_field=FloatField()
+                    )
+                )['total_revenue'] or 0.0
+
+                response = f"Total revenue for {year}: ${total:,.2f}"
+            else:
+                # Handle forecast data
+                forecasts = sale_forecast.objects.filter(ds__year=year)
+                total_forecast = sum([f.prediction for f in forecasts]) if forecasts else 0
+                response = f"Total sales forecast for {year}: ${total_forecast:,.2f}"
+
+            return JsonResponse({'response': response})  # Early return
+
+        # 3. Only check recommendations if sales check didn't return
+        recommendation_intent = detect_recommendation_intent(prompt)
+        if recommendation_intent.get('needs_recommendation', False) and recommendation_intent['confidence'] > 0.6:
+            # SAFETY: Even after fixes in llm_utils, add redundant checks
+            product_name = recommendation_intent['product_name'] or ''
+            product_name = product_name.upper().strip()
+
+            if not product_name:
+                return JsonResponse({'response': "Please specify a product for recommendations"})
+
+            recommendations = NextItemPrediction.objects.filter(
+                PredictedItemDescription__iexact=product_name
+            ).order_by('-Probability')[:10]
+
+            if recommendations.exists():
+                customer_list = "\n".join(
+                    [f"- User {rec.UserId} ({rec.Probability * 100:.1f}% probability)"
+                     for rec in recommendations]
+                )
+                response = f"Customers most likely to purchase {product_name}:\n{customer_list}"
+            else:
+                response = f"No prediction data available for {product_name}"
+
+            return JsonResponse({'response': response})  # Early return
+
+        # 4. Fallback to general AI (MUST RETURN)
         ai_response = query_openai(prompt)
         response = ai_response if "API Error" not in ai_response else \
             "Currently unavailable. Please try again later."
@@ -64,8 +204,8 @@ def ask_ai(request):
         return JsonResponse({'response': response})
 
     except Exception as e:
-        logger.error(f"Server Error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Server Error: {str(e)}", exc_info=True)
+        return JsonResponse({'error': "Internal server error"}, status=500)
 def top_30_sale_forecast(request):
     active_tab = request.GET.get('active_tab', 'top30-forecast')
     # Calculate date range (tomorrow + 30 days)
@@ -424,3 +564,5 @@ def generate_recommendations(request):
         return JsonResponse({'task_id': task.id})
     else:
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+

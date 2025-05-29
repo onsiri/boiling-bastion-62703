@@ -19,7 +19,7 @@
         <!-- Purchase Probability Tab -->
         <div class="tab-pane fade show active" id="purchase-probability">
             <div id="future-sale-content"
-                 hx-get="{% url 'ai_models:future_sale_prediction' %}?main_container=1"
+                 hx-get="{% url 'ai_models:customer_recommendations' %}?main_container=1"
                  hx-trigger="load"
                  hx-swap="innerHTML">
                 <div class="text-center py-5">
