@@ -213,20 +213,39 @@ body {
 
 
 /* Dropdown Menu */
+.dropdown {
+    position: relative;
+    background: #484848; /* Add this to match sidebar background */
+}
+
 .dropdown-menu {
-    background-color: var(--sidebar-bg);
-    border: 1px solid var(--industrial-metal) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-left: 1rem;
+    display: none;
+    position: absolute;
+    left: 0; /* Changed from 100% */
+    top: 100%; /* Changed from 0 */
+    min-width: 200px;
+    background: inherit; /* Changed from #fff to inherit parent's background */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    padding: 10px 0;
+    z-index: 1000;
+}
+
+/* Rest of your existing styles remain the same */
+.dropdown:hover .dropdown-menu {
+    display: block;
 }
 
 .dropdown-item {
-    padding: 0.5rem 1rem;
-    color: white;
+    padding: 8px 20px;
+    color: #333;
+    white-space: nowrap;
+    transition: all 0.2s;
 }
 
 .dropdown-item:hover {
-    background-color: rgba(0, 0, 0, 0.05) !important;
+    background: #f8f9fa;
+    padding-left: 25px;
 }
 .dropdown-menu .active {
     background-color: rgba(0, 0, 0, 0.05) !important;
