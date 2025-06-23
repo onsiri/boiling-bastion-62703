@@ -1,22 +1,11 @@
 {# templates/admin/ai_models/transaction/change_list.html #}
 {% extends "admin/ai_models/change_list.html" %}
-{% load static %}
+{% load static i18n admin_urls %}
 
 {% block extrahead %}
 {{ block.super }}
 <style>
     /* Custom spinner styles specific to TransactionAdmin */
-    .spinner-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.8);
-        display: none;
-        z-index: 1000;
-    }
-
     .transaction-spinner {
         position: absolute;
         top: 50%;
@@ -44,42 +33,50 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const uploadForm = document.querySelector('#bulkUploadForm');
+document.addEventListener('DOMContentLoaded', function() {
+    // Generic spinner control
+    const spinner = document.getElementById('transactionSpinner');
 
-        if(uploadForm) {
-            uploadForm.addEventListener('submit', function(e) {
-                const spinner = document.getElementById('transactionSpinner');
-                spinner.style.display = 'block';
-
-                // Keep spinner visible until redirect completes
-                window.addEventListener('beforeunload', function() {
-                    spinner.style.display = 'block';
-                });
-            });
-        }
-
-        // Hide spinner when page loads
-        document.getElementById('transactionSpinner').style.display = 'none';
-
-        // Use AJAX to submit the form
-        document.getElementById('bulkUploadForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var formData = new FormData(this);
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', this.action, true);
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    console.log('Job completed successfully');
-                    document.getElementById('transactionSpinner').style.display = 'none';
-                } else {
-                    console.log('Error completing job');
-                    document.getElementById('transactionSpinner').style.display = 'none';
-                }
-            };
-            xhr.send(formData);
-            document.getElementById('transactionSpinner').style.display = 'block';
+    // Handle both delete and upload actions
+    document.querySelectorAll('[data-bulk-action]').forEach(button => {
+        button.addEventListener('click', function() {
+            spinner.style.display = 'block';
         });
     });
+
+    // AJAX handling for upload form
+    const uploadForm = document.querySelector('form[data-upload-form]');
+    if(uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            spinner.style.display = 'block';
+
+            const formData = new FormData(this);
+            const xhr = new XMLHttpRequest();
+
+            xhr.open('POST', this.action, true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+            xhr.onload = function() {
+                spinner.style.display = 'none';
+                if (xhr.status === 200) {
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + xhr.responseText);
+                }
+            };
+
+            xhr.onerror = function() {
+                spinner.style.display = 'none';
+                alert('Network error');
+            };
+
+            xhr.send(formData);
+        });
+    }
+
+    // Hide spinner on initial load
+    spinner.style.display = 'none';
+});
 </script>
 {% endblock %}

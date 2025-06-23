@@ -8,16 +8,16 @@ from .models import Transaction, sale_forecast, NextItemPrediction, Item, Custom
 from .utils import generate_forecast, predict_future_sales, import_forecasts_from_s3, upload_object_db
 import numpy as np
 from .tasks import async_upload_object_db, async_predict_future_sales
-
+from django import forms
 
 class BulkActionMixin:
     # Bulk delete configuration
     show_delete_all = True
-    delete_confirmation_template = None  # Set a custom template if needed
+    delete_confirmation_template = 'admin/delete_confirmation.html'  # Set default
 
     # Bulk upload configuration
     show_upload = True
-    upload_confirmation_template = None
+    upload_confirmation_template = 'admin/delete_confirmation.html'  # Use same template
 
     def get_urls(self):
         urls = super().get_urls()
@@ -58,75 +58,62 @@ class BulkActionMixin:
                     f"Error deleting records: {str(e)}",
                     level=messages.ERROR
                 )
-            changelist_url = reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist')
-            return redirect(changelist_url)
+            return redirect(self.get_changelist_url())
 
-        context = {
-            **self.admin_site.each_context(request),
-            'opts': self.model._meta,
-            'title': 'Confirm Bulk Delete'
-        }
-        return render(
-            request,
-            self.delete_confirmation_template or 'admin/bulk_delete_confirmation.html',
-            context
-        )
+        context = self.get_confirmation_context(request, 'Confirm Bulk Delete')
+        return render(request, self.delete_confirmation_template, context)
 
     def bulk_upload_view(self, request):
         if request.method == 'POST':
             file = request.FILES.get('file')
             if not file:
-                self.message_user(request, "No file uploaded", level=40)
-                return redirect(reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'))
+                self.message_user(request, "No file uploaded", level=messages.ERROR)
+                return redirect(self.get_changelist_url())
 
             try:
                 df = self._process_uploaded_file(file)
                 return self.process_dataframe(request, df)
-
             except Exception as e:
-                self.message_user(request, f"Error: {str(e)}", level=40)
+                self.message_user(request, f"Error: {str(e)}", level=messages.ERROR)
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({'error': str(e)}, status=400)
-                return redirect(reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'))
+                return redirect(self.get_changelist_url())
 
-        context = self.admin_site.each_context(request)
-        context.update({
+        context = self.get_confirmation_context(request, 'Bulk Upload')
+        context['upload_mode'] = True  # Add upload mode flag
+        return render(request, self.upload_confirmation_template, context)
+
+    # Shared helper methods
+    def get_changelist_url(self):
+        return reverse(f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist')
+
+    def get_confirmation_context(self, request, title):
+        return {
+            **self.admin_site.each_context(request),
             'opts': self.model._meta,
-            'title': 'Bulk Upload'
-        })
-        return render(request, self.upload_confirmation_template or 'admin/bulk_upload_form.html', context)
+            'title': title
+        }
 
     def _handle_bulk_upload(self, request):
         file = request.FILES.get('file')
         if file is None:
             self.message_user(request, "No file uploaded", level=messages.ERROR)
-            changelist_url = reverse(
-                f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
-            )
-            return redirect(changelist_url)
+            return redirect(self.get_changelist_url())
 
         try:
             df = self._process_uploaded_file(file)
             return self.process_dataframe(request, df)
         except Exception as e:
-            self.message_user(
-                request,
-                f"Error processing file: {str(e)}",
-                level=messages.ERROR
-            )
-            changelist_url = reverse(
-                f'admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist'
-            )
-            return redirect(changelist_url)
+            self.message_user(request, f"Error processing file: {str(e)}", level=messages.ERROR)
+            return redirect(self.get_changelist_url())
 
     def _process_uploaded_file(self, file):
         import pandas as pd
         if file.name.endswith('.csv'):
             return pd.read_csv(file)
-        elif file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith(('.xls', '.xlsx')):
             return pd.read_excel(file)
-        else:
-            raise ValueError("Unsupported file format")
+        raise ValueError("Unsupported file format")
 
     def _validate_columns(self, df, required_columns):
         missing = required_columns - set(df.columns)
@@ -223,7 +210,6 @@ class TransactionAdmin(BulkActionMixin, admin.ModelAdmin):
                 error_msg = f"Missing users: {', '.join(sorted(missing_users)[:5])}"
                 if len(missing_users) > 5:
                     error_msg += f"... ({len(missing_users) - 5} more)"
-                self.message_user(request, error_msg, level=messageså.ERROR)
 
             # Bulk create transactions
             created_count = 0
@@ -399,9 +385,58 @@ class CountrySaleForecastAdmin(admin.ModelAdmin):
 
     list_display = ['group', 'ds', 'prediction', 'prediction_lower', 'prediction_upper']
 
-class ItemSaleForecastAdmin(admin.ModelAdmin):
+class CsvImportForm(forms.Form):
+    csv_file = forms.FileField()
 
+
+# In the ItemSaleForecastAdmin section
+class ItemSaleForecastAdmin(BulkActionMixin, admin.ModelAdmin):  # Add BulkActionMixin
+    change_list_template = "admin/ai_models/itemsaleforecast/change_list.html"
     list_display = ['group', 'ds', 'prediction', 'prediction_lower', 'prediction_upper']
+    show_delete_all = True
+    show_upload = True
+
+    def get_urls(self):
+        return super().get_urls()
+
+    def process_dataframe(self, request, df):
+        try:
+            self._validate_columns(df, {'ds', 'group', 'prediction', 'prediction_lower', 'prediction_upper'})
+            created_count = 0
+            errors = []
+
+            with transaction.atomic():
+                forecasts = []
+                for row in df.itertuples():
+                    try:
+                        forecasts.append(ItemSaleForecast(
+                            ds=pd.to_datetime(row.ds).date(),
+                            group=str(row.group),
+                            prediction=float(row.prediction),
+                            prediction_lower=float(row.prediction_lower),
+                            prediction_upper=float(row.prediction_upper)
+                        ))
+                    except Exception as e:
+                        errors.append(f"Row {row.Index}: {str(e)}")
+
+                if forecasts:
+                    ItemSaleForecast.objects.bulk_create(
+                        forecasts,
+                        update_conflicts=True,
+                        update_fields=['prediction', 'prediction_lower', 'prediction_upper'],
+                        unique_fields=['group', 'ds']
+                    )
+                    created_count = len(forecasts)
+
+            msg = f"Processed {created_count} forecasts"
+            if errors:
+                msg += f" with {len(errors)} errors"
+            self.message_user(request, msg, level=messages.SUCCESS if created_count else messages.WARNING)
+            return JsonResponse({'created': created_count, 'errors': len(errors)})
+
+        except Exception as e:
+            self.message_user(request, f"Upload failed: {str(e)}", level=messages.ERROR)
+            return JsonResponse({'error': str(e)}, status=400)
 
 # Registration
 admin.site.register(Transaction, TransactionAdmin)

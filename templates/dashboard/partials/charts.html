@@ -119,3 +119,24 @@
 </div>
 
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Country Forecast Chart
+    const countryChartDiv = document.getElementById('country-forecast-chart');
+    if (countryChartDiv) {
+        Plotly.relayout(countryChartDiv, {
+            'xaxis.range': ['2025-01-01', '2025-12-28'],
+            'xaxis.tickformat': '%b %Y'
+        });
+    }
+
+    // Item Forecast Chart
+    const itemChartDiv = document.getElementById('item-forecast-chart');
+    if (itemChartDiv) {
+        Plotly.relayout(itemChartDiv, {
+            'xaxis.range': ['2025-01-01', '2025-12-28'],
+            'xaxis.tickformat': '%b %Y'
+        });
+    }
+});
+</script>

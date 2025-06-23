@@ -1,11 +1,7 @@
 <div class="container mt-4">
     {% load humanize %}
-    <style>
-
-    </style>
-
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>{% if standalone %}30 Days{% else %}Sales{% endif %} Forecast</h1>
+        <h1>30 Days Sales Forecast</h1>
         <a href="{% url 'ai_models:top_30_sale_forecast' %}?export=csv{% for key,value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
            class="btn btn-sm {% if standalone %}btn-success{% else %}btn-primary{% endif %}"
            hx-boost="false"
@@ -17,6 +13,9 @@
     <div class="{% if not standalone %}card shadow-sm{% endif %}">
         <div class="{% if not standalone %}card-body{% endif %}">
             <div class="table-responsive">
+                <div class="bg-light p-2 mb-3">
+                <small>Showing data from {{ start_date|date:"Y-m-d" }} to {{ end_date|date:"Y-m-d" }}</small>
+            </div>
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>

@@ -141,16 +141,23 @@ class CountrySaleForecast(models.Model):
 
 class ItemSaleForecast(models.Model):
     ds = models.DateField()
-    group = models.CharField(max_length=200)  # Stores ItemDescription
+    group = models.CharField(max_length=200)
     prediction = models.FloatField()
     prediction_lower = models.FloatField()
     prediction_upper = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        managed = False
+        db_table = 'ai_models_itemsaleforecast'
+        constraints = [
+            models.UniqueConstraint(
+                name='unique_group_ds',
+                fields=['group', 'ds'],
+                violation_error_message='Duplicate forecast entry'
+            )
+        ]
         indexes = [
             models.Index(fields=['group', 'ds']),
             models.Index(fields=['ds'])
         ]
-        managed = False  # Only if managing DB separately
-        db_table = 'ai_models_itemsaleforecast'

@@ -1,0 +1,25 @@
+{# templates/admin/ai_models/itemsaleforecast/change_list.html #}
+{% extends "admin/ai_models/change_list.html" %}
+{% load static i18n admin_urls %}
+
+{% block object-tools-items %}
+{{ block.super }}
+{% if show_upload %}
+<li>
+    <a href="{% url opts|admin_urlname:'bulk_upload' %}" class="addlink" data-bulk-action>
+        {% trans "Bulk Upload Forecasts" %}
+    </a>
+</li>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle bulk upload click
+    document.querySelectorAll('[data-bulk-action]').forEach(button => {
+        button.addEventListener('click', function() {
+            // Add any custom behavior here if needed
+        });
+    });
+});
+</script>
+{% endblock %}

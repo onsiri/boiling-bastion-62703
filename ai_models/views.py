@@ -24,7 +24,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .llm_utils import query_openai, detect_forecast_intent, detect_recommendation_intent, detect_strategic_intent
 import re
-
+from django.db import connection
 
 def generate_strategic_recommendations():
     """Generate data-driven recommendations using all available models"""
@@ -129,7 +129,6 @@ def generate_strategic_recommendations():
 
     return recommendations if recommendations else ["No specific recommendations found in current data"]
 @require_POST
-@require_POST
 def ask_ai(request):
     try:
         prompt = request.POST.get('prompt', '').strip().lower()  # Add .lower()
@@ -223,17 +222,49 @@ def ask_ai(request):
         logger.error(f"Server Error: {str(e)}", exc_info=True)
         return JsonResponse({'error': "Internal server error"}, status=500)
 def top_30_sale_forecast(request):
+    print("DEBUG - ENTERING top_30_sale_forecast VIEW")
     active_tab = request.GET.get('active_tab', 'top30-forecast')
     # Calculate date range (tomorrow + 30 days)
     today = timezone.now().date()
     start_date = today + timedelta(days=1)
     end_date = today + timedelta(days=30)
 
+    print(f"DEBUG - TODAY: {today}", flush=True)
+    print(f"DEBUG - FILTER RANGE: {start_date} to {end_date}", flush=True)
+
+    # Base query with date filter
+    # Check what data exists in the database
+    all_forecasts = sale_forecast.objects.all().order_by('ds')
+    if all_forecasts.exists():
+        print(f"DEBUG - DB HAS DATA: {all_forecasts.count()} records")
+        print(f"DEBUG - FIRST DATE: {all_forecasts.first().ds}")
+        print(f"DEBUG - LAST DATE: {all_forecasts.last().ds}")
+
+        # Verify if any records match our date range
+        matching = sale_forecast.objects.filter(ds__gte=start_date, ds__lte=end_date)
+        print(f"DEBUG - MATCHING RECORDS: {matching.count()}")
+
+        # Directly check a specific date to see if it matches
+        test_date = start_date
+        test_match = sale_forecast.objects.filter(ds=test_date)
+        print(f"DEBUG - TEST FOR {test_date}: {test_match.exists()}")
+
+        # Try string-based filtering as a test
+        start_str = start_date.strftime('%Y-%m-%d')
+        end_str = end_date.strftime('%Y-%m-%d')
+        print(f"DEBUG - TRYING STRING DATES: {start_str} to {end_str}")
+
+        from django.db.models import Q
+        test_query = sale_forecast.objects.filter(
+            Q(ds__gte=start_date) & Q(ds__lte=end_date)
+        )
+        print(f"DEBUG - EXPLICIT Q OBJECTS: {test_query.count()}")
+
     # Base query with date filter
     base_query = sale_forecast.objects.filter(
         ds__gte=start_date,
         ds__lte=end_date
-    )
+    ).order_by('ds')
 
     # Default sorting values
     default_sort = 'ds'  # Forecast date
@@ -242,7 +273,8 @@ def top_30_sale_forecast(request):
     # Handle CSV export
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast_{today}.csv"'
+        response[
+            'Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast_{today}.csv"'
         response['X-Content-Type-Options'] = 'nosniff'  # Add this
         response['Cache-Control'] = 'no-cache'  # Add this
 
@@ -303,8 +335,10 @@ def top_30_sale_forecast(request):
         'sort_by': sort_by,
         'sort_order': sort_order,
         'request': request,
-        'date_range': f"{start_date} to {end_date}",
-        'active_tab': active_tab  # Add this
+        'date_range': f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}",
+        'start_date': start_date,
+        'end_date': end_date,
+        'active_tab': active_tab
     }
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -315,7 +349,13 @@ def top_30_sale_forecast(request):
     return render(request, template_name, context)
 
 def generate_plot(figure):
+    # Add this section to enforce date range
     figure.update_layout(
+        xaxis=dict(
+            range=['2025-01-01', '2025-12-28'],
+            tickformat='%b %Y'  # Shows "Jan 2025", "Feb 2025", etc.
+        ),
+        # Existing layout config
         autosize=True,
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -325,7 +365,6 @@ def generate_plot(figure):
         full_html=False,
         config={'responsive': True}
     )
-
 def future_sale_prediction(request):
     # Filter parameters
     filters = {
