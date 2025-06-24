@@ -148,7 +148,6 @@ class ItemSaleForecast(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = 'ai_models_itemsaleforecast'
         constraints = [
             models.UniqueConstraint(
