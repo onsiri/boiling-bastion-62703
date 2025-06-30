@@ -144,22 +144,40 @@ def get_sales_forecast_context(request):
 
         fig = pgo.Figure()
         x_values = week_labels if resampled else df['ds']
-        chart_config = {
-            'line': {
-                'mode': 'lines+markers',
-                'line': {'width': 2, 'shape': 'spline' if not resampled else 'linear'}
-            },
-            'bar': {'type': 'bar', 'marker': {'color': '#4C78A8'}},
-            'scatter': {'mode': 'markers', 'marker': {'size': 12}}
-        }.get(chart_type, {})
 
-        fig.add_trace(pgo.Scatter(
-            x=x_values,
-            y=df['prediction'],
-            **chart_config,
-            hoverinfo='x+y'
-        ))
+        # Handle different chart types
+        if chart_type == 'bar':
+            fig.add_trace(pgo.Bar(
+                x=x_values,
+                y=df['prediction'],
+                marker={'color': '#4C78A8'},
+                hoverinfo='x+y'
+            ))
+            # Specific layout adjustments for bar charts
+            fig.update_layout(
+                yaxis=dict(
+                    autorange=True,
+                    rangemode='tozero'  # Ensure bars start from zero
+                )
+            )
+        elif chart_type == 'scatter':
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='markers',
+                marker={'size': 12},
+                hoverinfo='x+y'
+            ))
+        else:  # Default to line chart
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='lines+markers',
+                line={'width': 2, 'shape': 'spline' if not resampled else 'linear'},
+                hoverinfo='x+y'
+            ))
 
+        # Common layout settings
         layout_config = {
             'title': title,
             'margin': dict(l=40, r=40, t=40, b=40),
@@ -192,6 +210,74 @@ def get_sales_forecast_context(request):
         )
     }
 
+    # Chart generation helper
+    def create_figure(data, chart_type, title):
+        df = pd.DataFrame.from_records(data.values('ds', 'prediction'))
+        if df.empty:
+            return None
+
+        df['ds'] = pd.to_datetime(df['ds'])
+        df.sort_values('ds', inplace=True)
+
+        resampled = len(df) > 100
+        week_labels = []
+
+        if resampled:
+            resampled_df = df.set_index('ds').resample('W').mean().reset_index()
+            week_labels = [
+                f"Week{(row.ds.day - 1) // 7 + 1} {row.ds.strftime('%b %Y')}"
+                for row in resampled_df.itertuples()
+            ]
+            df = resampled_df
+
+        # Create a new figure
+        fig = pgo.Figure()
+
+        x_values = week_labels if resampled else df['ds']
+
+        # The key fix: Create different trace types based on chart_type
+        if chart_type == 'line':
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='lines+markers',
+                line={'width': 2, 'shape': 'spline' if not resampled else 'linear'},
+                hoverinfo='x+y'
+            ))
+        elif chart_type == 'bar':
+            fig.update_layout(
+                yaxis=dict(
+                    autorange=True,  # Force autorange for bar charts
+                    rangemode='tozero'  # Ensure y-axis starts at zero for bars
+                ))
+        else:  # Default to scatter
+            fig.add_trace(pgo.Scatter(
+                x=x_values,
+                y=df['prediction'],
+                mode='markers',
+                marker={'size': 12},
+                hoverinfo='x+y'
+            ))
+
+        layout_config = {
+            'title': title,
+            'margin': dict(l=40, r=40, t=40, b=40),
+            'plot_bgcolor': 'rgba(240,240,240,0.8)',
+            'xaxis': {
+                'type': 'category' if resampled else 'date',
+                'tickangle': 45,
+                'tickvals': list(range(len(week_labels))) if resampled else None,
+                'ticktext': week_labels if resampled else None
+            },
+            'yaxis': {'title': 'Sales Prediction'},
+            'uirevision': 'static'
+        }
+
+        if not resampled:
+            layout_config['xaxis']['rangeslider'] = {'visible': True}
+
+        fig.update_layout(**layout_config)
+        return plot(fig, output_type='div')
     # Metrics calculations
     def get_monthly_totals():
         return CountrySaleForecast.objects.annotate(
@@ -335,11 +421,6 @@ def sales_forecast_view(request):
 def sales_forecast_partial(request):
     context = get_combined_context(request)
     return render(request, 'dashboard/partials/main_content.html', context)
-
-
-
-
-
 
 def generate_chart_data(chart_type, filters):
     """Generate data for async chart requests"""

@@ -14,7 +14,7 @@
 
     {% block extra_css %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" /><script src="https://unpkg.com/htmx.org@1.9.5"></script>
     {% endblock %}
 </head>
 
@@ -52,21 +52,21 @@
                 </a>
                 <ul class="dropdown-menu">
                     <li>
-                        <a href="{% url 'personalization' %}"
+                        <a href="{% url 'dashboard:personalization' %}"
                            class="dropdown-item {% if request.path == '/personalization/' %}active{% endif %}">
                             <i class="fa-solid fa-user-check"></i>
                             Customer Recommendation
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'new_customer_rec' %}"
+                        <a href="{% url 'dashboard:new_customer_rec' %}"
                            class="dropdown-item {% if request.path == '/new_customer_rec/' %}active{% endif %}">
                             <i class="fa-solid fa-user-plus"></i>
                             New Customer Prediction
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'sales_forecast' %}"
+                        <a href="{% url 'ai_models:sales_forecast_dashboard' %}"
                            class="dropdown-item {% if request.path == '/sales_forecast/' %}active{% endif %}">
                             <i class="fa-solid fa-chart-line"></i>
                             Sales Forecast
@@ -163,4 +163,5 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     {% endblock %}
 </body>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </html>

@@ -3,7 +3,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import F, Sum, FloatField, IntegerField, Count
 from django.db.models.functions import Cast, Substr, Trim
-from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation, Transaction, CustomerDetail, CountrySaleForecast
+from .models import sale_forecast, NextItemPrediction, NewCustomerRecommendation, Transaction, CustomerDetail, \
+    CountrySaleForecast, ItemSaleForecast
 from django.db.models import F, OuterRef, Subquery, Max
 from datetime import datetime, timedelta
 from django.core.exceptions import FieldError
@@ -24,6 +25,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .llm_utils import query_openai, detect_forecast_intent, detect_recommendation_intent, detect_strategic_intent
 import re
+from django.db.models import Value, CharField, F, Sum, FloatField, IntegerField, Count, Min, Max, Q
+from django.db.models.functions import Cast, Substr, Trim
 from django.db import connection
 
 def generate_strategic_recommendations():
@@ -221,8 +224,121 @@ def ask_ai(request):
     except Exception as e:
         logger.error(f"Server Error: {str(e)}", exc_info=True)
         return JsonResponse({'error': "Internal server error"}, status=500)
+
+
+def sales_forecast_dashboard(request):
+    from dashboard.views import get_sales_forecast_context
+
+    active_tab = request.GET.get('active_tab', 'top30-forecast')
+    today = timezone.now().date()
+    start_date = today + timedelta(days=1)
+    end_date = today + timedelta(days=30)
+
+    # Get sales forecasts - use whatever data we have if there's no data for next 30 days
+    forecasts = sale_forecast.objects.filter(
+        ds__gte=start_date,
+        ds__lte=end_date
+    ).order_by('ds')
+
+    if not forecasts.exists():
+        # If we don't have data in the next 30 days, get the earliest data available
+        all_forecasts = sale_forecast.objects.all().order_by('ds')
+        if all_forecasts.exists():
+            start_date = all_forecasts.first().ds
+            end_date = start_date + timedelta(days=30)
+            forecasts = sale_forecast.objects.filter(
+                ds__gte=start_date,
+                ds__lte=end_date
+            ).order_by('ds')
+
+    # Default sorting values
+    default_sort = 'ds'  # Forecast date
+    default_order = 'asc'  # Chronological order
+
+    # Get sort parameters
+    sort_by = request.GET.get('sort_by', default_sort)
+    sort_order = request.GET.get('sort_order', default_order)
+
+    # Validate sort parameters
+    valid_sort_fields = {'ds', 'prediction', 'uploaded_at'}
+    if sort_by not in valid_sort_fields:
+        sort_by = default_sort
+        sort_order = default_order
+
+    # Create order_by expression
+    order_prefix = '-' if sort_order == 'desc' else ''
+    order_by = f'{order_prefix}{sort_by}'
+
+    # Handle CSV export (from the old top_30_sale_forecast function)
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response[
+            'Content-Disposition'] = f'attachment; filename="30_days_Sales_Forecast_{today}.csv"'
+        response['X-Content-Type-Options'] = 'nosniff'  # Add this
+        response['Cache-Control'] = 'no-cache'  # Add this
+
+        writer = csv.writer(response)
+        writer.writerow(['Date', 'Prediction', 'Prediction Lower', 'Prediction Upper', 'Uploaded At'])
+
+        try:
+            queryset = forecasts.order_by(f'{order_prefix}{sort_by}')
+            for item in queryset:
+                writer.writerow([
+                    item.ds.strftime('%Y-%m-%d'),  # Explicitly format date
+                    max(0, item.prediction),
+                    max(0, item.prediction_lower),
+                    max(0, item.prediction_upper),
+                    item.uploaded_at.strftime('%Y-%m-%d %H:%M')  # Format datetime
+                ])
+            return response
+        except Exception as e:
+            return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
+
+    try:
+        sorted_query = forecasts.order_by(order_by)
+    except FieldError:
+        sorted_query = forecasts.order_by(default_sort)
+
+    # Pagination setup
+    items_per_page = 20  # One day per row
+    paginator = Paginator(sorted_query, items_per_page)
+    page_number = request.GET.get('page')
+
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    # Base context for the first tab
+    context = {
+        'page_obj': page_obj,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'request': request,
+        'date_range': f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}",
+        'start_date': start_date,
+        'end_date': end_date,
+        'active_tab': active_tab
+    }
+
+    # If dashboard tab is active, get dashboard context from dashboard app
+    if active_tab == 'dashboard-content':
+        dashboard_context = get_sales_forecast_context(request)
+        context.update(dashboard_context)
+
+    # Choose template based on request type
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template_name = 'dashboard/partials/top_30_sale_forecast_partial.html'
+    else:
+        template_name = 'dashboard/sales_forecast.html'
+
+    return render(request, template_name, context)
 def top_30_sale_forecast(request):
-    print("DEBUG - ENTERING top_30_sale_forecast VIEW")
+    import sys
+    sys.stderr.write("DEBUG - VIEW DEFINITELY RUNNING\n")
+    sys.stderr.flush()
     active_tab = request.GET.get('active_tab', 'top30-forecast')
     # Calculate date range (tomorrow + 30 days)
     today = timezone.now().date()
@@ -347,6 +463,7 @@ def top_30_sale_forecast(request):
         template_name = 'dashboard/sales_forecast.html'
 
     return render(request, template_name, context)
+
 
 def generate_plot(figure):
     # Add this section to enforce date range

@@ -9,6 +9,8 @@ from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
     path('admin/', admin.site.urls,  name='admin'),
+    path('ai-models/', include('ai_models.urls')),
+
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("pages.urls")),
     path("accounts/", include("accounts.urls")),

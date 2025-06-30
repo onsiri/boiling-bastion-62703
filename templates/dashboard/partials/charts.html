@@ -1,142 +1,182 @@
- <!-- Distribution Pie Charts -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="chart-container">
-                <h4>Country Sales Distribution</h4>
-                <div id="country-pie-plot">
-                    {{ country_pie_plot|safe }}
-                </div>
-                <small class="text-muted">* Countries with &lt;1% are grouped under 'Other'</small>
-            </div>
-        </div>
+{% load static %}
 
-        <div class="col-md-6">
-            <div class="chart-container">
-                <h4>Item Sales Distribution</h4>
-                <div id="item-pie-plot">
-                    {{ item_pie_plot|safe }}
-                </div>
-                <small class="text-muted">* Item falls under top 30 are grouped under 'Other'</small>
+<!-- Distribution Pie Charts -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h4>Country Sales Distribution</h4>
+            <div id="country-pie-plot">
+                {{ country_pie_plot|safe }}
             </div>
+            <small class="text-muted">* Countries with &lt;1% are grouped under 'Other'</small>
         </div>
     </div>
-    <!-- Country Forecast Section -->
-<form method="GET" hx-get="{% url 'sales_forecast_partial' %}" hx-target="#main-content" hx-push-url="true">
-    <div class="dashboard-section compact-section mb-3">
-        <h4 class="section-title small-title">Sales Forecast Filters</h4>
-        <div class="row g-2">
-            <!-- Country Filter -->
-            <div class="col-md-3">
-                <select name="country_group" class="form-select">
-                    <option value="All" {% if country_selected == 'All' %}selected{% endif %}>All Countries</option>
-                    {% for group in country_groups %}
-                        {% if group != "All" %}
-                        <option value="{{ group }}" {% if country_selected == group %}selected{% endif %}>
-                            {{ group }}
-                        </option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
+
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h4>Item Sales Distribution</h4>
+            <div id="item-pie-plot">
+                {{ item_pie_plot|safe }}
+            </div>
+            <small class="text-muted">* Items falling under top 30 are grouped under 'Other'</small>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Section -->
+<form id="filters-form" method="GET" action="{% url 'ai_models:sales_forecast_dashboard' %}">
+    <input type="hidden" name="active_tab" value="dashboard-content">
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Sales Forecast Filters</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Left column: Country filters -->
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="country-filter" class="form-label fw-bold">Country</label>
+                        <select id="country-filter" name="country_group" class="form-select filter-control">
+                            <option value="All" {% if country_selected == 'All' %}selected{% endif %}>All Countries</option>
+                            {% for group in country_groups %}
+                                {% if group != "All" %}
+                                <option value="{{ group }}" {% if country_selected == group %}selected{% endif %}>
+                                    {{ group }}
+                                </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="country-chart-type" class="form-label fw-bold">Country Chart Type</label>
+                        <select id="country-chart-type" name="country_chart_type" class="form-select filter-control">
+                            {% for ct in chart_types %}
+                            <option value="{{ ct }}" {% if country_chart_type == ct %}selected{% endif %}>
+                                {{ ct|title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right column: Item filters -->
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="item-filter" class="form-label fw-bold">Item</label>
+                        <select id="item-filter" name="item_group" class="form-select filter-control">
+                            <option value="All" {% if item_selected == 'All' %}selected{% endif %}>All Items</option>
+                            {% for group in item_groups %}
+                                {% if group != "All" %}
+                                <option value="{{ group }}" {% if item_selected == group %}selected{% endif %}>
+                                    {{ group }}
+                                </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="item-chart-type" class="form-label fw-bold">Item Chart Type</label>
+                        <select id="item-chart-type" name="item_chart_type" class="form-select filter-control">
+                            {% for ct in chart_types %}
+                            <option value="{{ ct }}" {% if item_chart_type == ct %}selected{% endif %}>
+                                {{ ct|title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            <!-- Country Chart Type -->
-            <div class="col-md-2">
-                <select name="country_chart_type" class="form-select">
-                    {% for ct in chart_types %}
-                    <option value="{{ ct }}" {% if country_chart_type == ct %}selected{% endif %}>
-                        {{ ct|title }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Item Filter -->
-            <div class="col-md-3">
-                <select name="item_group" class="form-select">
-                    <option value="All" {% if item_selected == 'All' %}selected{% endif %}>All Items</option>
-                    {% for group in item_groups %}
-                        {% if group != "All" %}
-                        <option value="{{ group }}" {% if item_selected == group %}selected{% endif %}>
-                            {{ group }}
-                        </option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Item Chart Type -->
-            <div class="col-md-2">
-                <select name="item_chart_type" class="form-select">
-                    {% for ct in chart_types %}
-                    <option value="{{ ct }}" {% if item_chart_type == ct %}selected{% endif %}>
-                        {{ ct|title }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">Update</button>
+            <!-- Filter action buttons -->
+            <div class="d-flex justify-content-end mt-3">
+                <div class="form-check me-3 align-self-center">
+                    <input class="form-check-input" type="checkbox" id="auto-submit-toggle">
+                    <label class="form-check-label" for="auto-submit-toggle">
+                        Auto-apply filters
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel-fill me-1"></i> Apply Filters
+                </button>
             </div>
         </div>
     </div>
 </form>
+
 <!-- Country Forecast Section -->
-<div class="row">  <!-- Full-width row -->
-    <div class="col-12">  <!-- Full-width column -->
+<div class="row" id="country-forecast-section">
+    <div class="col-12">
         <div class="chart-container mb-4">
-            <h4>Country Sales Forecast</h4>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">Country Sales Forecast - {{ country_selected }}</h4>
+                <span class="badge bg-info">{{ country_chart_type|title }} Chart</span>
+            </div>
+            <hr class="mt-1 mb-3">
+
             {% if country_plot %}
-                <div class="chart-wrapper" style="height: 400px; width: 100%;">
+                <div class="chart-wrapper" style="height: 400px; width: 100%; position: relative;">
                     <div id="country-forecast-chart" class="plotly-chart">
                         {{ country_plot|safe }}
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-warning mt-3">No country forecast data available</div>
+                <div class="alert alert-warning mt-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>No country forecast data available
+                </div>
             {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Item Forecast Section -->
-<div class="row">  <!-- Full-width row -->
-    <div class="col-12">  <!-- Full-width column -->
+<div class="row" id="item-forecast-section">
+    <div class="col-12">
         <div class="chart-container mb-4">
-            <h4>Item Sales Forecast</h4>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">Item Sales Forecast - {{ item_selected }}</h4>
+                <span class="badge bg-info">{{ item_chart_type|title }} Chart</span>
+            </div>
+            <hr class="mt-1 mb-3">
+
             {% if item_plot %}
-                <div class="chart-wrapper" style="height: 400px; width: 100%;">
+                <div class="chart-wrapper" style="height: 400px; width: 100%; position: relative;">
                     <div id="item-forecast-chart" class="plotly-chart">
                         {{ item_plot|safe }}
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-warning mt-3">No item forecast data available</div>
+                <div class="alert alert-warning mt-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>No item forecast data available
+                </div>
             {% endif %}
         </div>
     </div>
 </div>
 
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Country Forecast Chart
-    const countryChartDiv = document.getElementById('country-forecast-chart');
-    if (countryChartDiv) {
-        Plotly.relayout(countryChartDiv, {
-            'xaxis.range': ['2025-01-01', '2025-12-28'],
-            'xaxis.tickformat': '%b %Y'
+    function initializeCharts() {
+        const charts = document.querySelectorAll('.js-plotly-plot');
+
+        charts.forEach(chart => {
+            if (chart.data && chart.data[0] && chart.data[0].type === 'bar') {
+                Plotly.relayout(chart, {
+                    'yaxis.autorange': true,
+                    'yaxis.rangemode': 'tozero'
+                });
+            }
         });
     }
 
-    // Item Forecast Chart
-    const itemChartDiv = document.getElementById('item-forecast-chart');
-    if (itemChartDiv) {
-        Plotly.relayout(itemChartDiv, {
-            'xaxis.range': ['2025-01-01', '2025-12-28'],
-            'xaxis.tickformat': '%b %Y'
-        });
-    }
+    // Initial initialization
+    initializeCharts();
+
+    // Re-initialize after any dynamic updates
+    document.addEventListener('DOMContentSubtreeModified', function() {
+        setTimeout(initializeCharts, 500);
+    });
 });
 </script>

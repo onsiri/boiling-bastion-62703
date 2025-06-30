@@ -7,28 +7,35 @@
 <!-- Tabs Navigation -->
 <ul class="nav nav-tabs mb-4" id="dashboardTabs">
     <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="?active_tab=top30-forecast#top30-forecast">Sales Forecast</a>
+        <a class="nav-link {% if active_tab == 'top30-forecast' or not active_tab %}active{% endif %}"
+           href="{% url 'ai_models:sales_forecast_dashboard' %}?active_tab=top30-forecast">
+            Sales Forecast
+        </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="?active_tab=dashboard-content#dashboard-content">Analytic Dashboard</a>
+        <a class="nav-link {% if active_tab == 'dashboard-content' %}active{% endif %}"
+           href="{% url 'ai_models:sales_forecast_dashboard' %}?active_tab=dashboard-content">
+            Analytic Dashboard
+        </a>
     </li>
 </ul>
 
 <!-- Tab Content -->
 <div class="tab-content">
     <!-- Top 30 Forecast Tab -->
-    <div class="tab-pane fade show active" id="top30-forecast">
+    <div class="tab-pane fade {% if active_tab == 'top30-forecast' or not active_tab %}show active{% endif %}" id="top30-forecast">
         {% include "dashboard/partials/top_30_sale_forecast_partial.html" %}
     </div>
 
     <!-- Dashboard Tab -->
-    <div class="tab-pane fade" id="dashboard-content">
+    <div class="tab-pane fade {% if active_tab == 'dashboard-content' %}show active{% endif %}" id="dashboard-content">
         <div id="main-content">
             {% include "dashboard/partials/main_content.html" %}
         </div>
     </div>
 </div>
-    <style>
+
+<style>
     /* Nuclear CSS Reset for Charts */
     .plotly-chart-container {
         width: 100% !important;
