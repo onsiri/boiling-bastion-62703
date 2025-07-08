@@ -62,81 +62,103 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
+    <style>
+        #trendingMap {
+            height: 600px !important;
+            background: #f8f9fa;
+        }
+        .leaflet-container {
+            background: #f8f9fa !important;
+        }
+    </style>
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         let map = null;
-        const geoData = JSON.parse(document.getElementById('geospatial-data').textContent);
-        const defaultCoordinates = [{{ default_lat }}, {{ default_lng }}];
+        let geoData = [];
+
+        // Load geospatial data
+        try {
+            const dataElement = document.getElementById('geospatial-data');
+            if (dataElement) {
+                geoData = JSON.parse(dataElement.textContent);
+                console.log('Geospatial data loaded:', geoData);
+            }
+        } catch (e) {
+            console.error('Error parsing geospatial data:', e);
+        }
 
         function initMap() {
-    // Cleanup existing map
-    if (map) {
-        map.remove();
-        map = null;
-    }
+            // Cleanup existing map
+            if (map) {
+                map.remove();
+                map = null;
+            }
 
-    const container = document.getElementById('trendingMap');
-    if (!container) {
-        console.error('Map container not found');
-        return;
-    }
+            const container = document.getElementById('trendingMap');
+            if (!container) return;
 
-    // Clear any existing error messages
-    container.innerHTML = '';
+            // Initialize new map
+            try {
+                map = L.map('trendingMap', {
+                    center: [{{ default_lat|default:51.5074 }}, {{ default_lng|default:0.1278 }}],
+                    zoom: 3,
+                    attributionControl: false
+                });
 
-    try {
-        map = L.map('trendingMap', {
-            center: defaultCoordinates,
-            zoom: geoData.length > 0 ? 3 : 1,
-            attributionControl: false
-        });
+                // Add tile layer with HTTPS
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(map);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18
-        }).addTo(map);
+                // Add markers if data exists
+                if (geoData.length > 0) {
+                    const markers = L.markerClusterGroup();
 
-        if (geoData.length > 0) {
-            const markers = L.markerClusterGroup();
+                    geoData.forEach(location => {
+                        if (location.latitude && location.longitude) {
+                            const marker = L.marker([location.latitude, location.longitude]);
 
-            geoData.forEach(location => {
-                // Validate coordinates
-                if (!location.latitude || !location.longitude) {
-                    console.warn('Invalid coordinates for:', location.country);
-                    return;
+                            // Popup content
+                            let popup = `<div style="max-width:250px;">
+                                <strong>\${location.country || 'Unknown'}</strong>
+                                <p>Recommendations: \${location.total_recommendations || 0}</p>`;
+
+                            if (location.top_items?.length) {
+                                popup += `<p>Top Items:<ul>`;
+                                location.top_items.slice(0, 3).forEach(item => {
+                                    popup += `<li>\${item.code}: \${item.name}</li>`;
+                                });
+                                popup += `</ul></p>`;
+                            }
+                            popup += `</div>`;
+
+                            marker.bindPopup(popup);
+                            markers.addLayer(marker);
+                        }
+                    });
+
+                    map.addLayer(markers);
+                    map.fitBounds(markers.getBounds());
+                } else {
+                    container.innerHTML = '<div class="alert alert-warning m-3">No geospatial data available</div>';
                 }
 
-                const marker = L.marker([location.latitude, location.longitude])
-                    .bindPopup(`...`);
-                markers.addLayer(marker);
-            });
-
-            map.addLayer(markers);
-            map.fitBounds(markers.getBounds());
-        } else {
-            container.innerHTML = `
-                <div class="alert alert-warning m-3">
-                    No geospatial data available
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('Map initialization error:', error);
-        container.innerHTML = `
-            <div class="alert alert-danger m-3">
-                Error initializing map: \\${error.message}
-            </div>
-        `;
-    }
-}
-
-        // Initialize map when tab is shown
-        document.getElementById('personalizationTabs').addEventListener('shown.bs.tab', function(e) {
-            if (e.target.hash === '#recommendation-dashboard') {
-                setTimeout(initMap, 100); // Allow tab transition to complete
+                // Force map resize
+                setTimeout(() => map.invalidateSize(), 100);
+            } catch (error) {
+                console.error('Map error:', error);
+                container.innerHTML = '<div class="alert alert-danger m-3">Error loading map</div>';
             }
+        }
+
+        // Initialize map when dashboard tab is shown
+        document.querySelector('a[href="#recommendation-dashboard"]').addEventListener('shown.bs.tab', function() {
+            setTimeout(initMap, 300);
         });
 
-        // Initialize if already on dashboard tab
+        // Initialize map if already on dashboard tab
         if (document.querySelector('#recommendation-dashboard.active')) {
             initMap();
         }

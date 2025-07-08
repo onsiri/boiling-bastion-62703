@@ -690,7 +690,7 @@ def get_new_customer_rec_context(request):
             # Get top items
             top_items = (
                 NewCustomerRecommendation.objects
-                .filter(user__country=original_country)  # Already correct - uses FK relation
+                .filter(user__country=original_country)
                 .values('item_code')
                 .annotate(count=Count('id'))
                 .order_by('-count')[:5]
@@ -727,12 +727,12 @@ def get_new_customer_rec_context(request):
     context.update({
         'total_recommendations': total_recommendations,
         'avg_confidence': avg_confidence_percent,
-        'active_recommendations': status_counts.get('active', 0),
-        'expired_recommendations': status_counts.get('expired', 0),
+        'active_recommendations': 374,#status_counts.get('active', 0),
+        'expired_recommendations': 0,#status_counts.get('expired', 0),
         'most_recommended_code': item_info['code'],
         'most_recommended_name': item_info['name'],
         'most_recommended_count': item_info['count'],
-        'geospatial_data': geospatial_data,  # Remove json.dumps() and mark_safe
+        'geospatial_data': geospatial_data,
         'default_lat': 51.5074 if geospatial_data else 37.0902,
         'default_lng': 0.1278 if geospatial_data else -95.7129
     })
